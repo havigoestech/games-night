@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grab the Mic — Host</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .judge-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; max-width: 480px; }
+    .buzzers-live-text { font-family: 'Fredoka', sans-serif; font-size: 1.6rem; color: #34C759; letter-spacing: 0.04em; }
+    .live-indicator { display: flex; align-items: center; gap: 10px; justify-content: center; }
+    .team-count-row { display: flex; align-items: center; gap: 16px; justify-content: center; margin-bottom: 20px; }
+    .count-btn { width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: #fff; font-size: 1.4rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+    .count-btn:hover { background: rgba(255,255,255,0.15); }
+    .count-num { font-family: 'Fredoka', sans-serif; font-size: 2.5rem; font-weight: 700; min-width: 48px; text-align: center; }
+    .section-label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 10px; }
+    .lobby-code-section { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; justify-content: center; margin-bottom: 24px; }
+    .lobby-code-left { text-align: center; }
+    .lobby-join-url { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; word-break: break-all; }
+    #screen-lobby { justify-content: flex-start; padding-top: 32px; }
+    .lobby-actions { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+    .result-banner { font-family: 'Fredoka', sans-serif; font-size: 1.2rem; font-weight: 600; padding: 10px 20px; border-radius: 12px; margin-bottom: 8px; }
+    .result-banner.awarded     { background: rgba(52,199,89,0.2);  color: #34C759; }
+    .result-banner.not-awarded { background: rgba(255,45,85,0.2);  color: #FF2D55; }
+    #screen-game-over { justify-content: flex-start; padding-top: 32px; }
+    .back-link { display: inline-flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.4); font-size: 0.85rem; font-weight: 700; text-decoration: none; margin-bottom: 8px; }
+    .back-link:hover { color: rgba(255,255,255,0.7); }
+  </style>
+</head>
+<body>
+
+  <!-- SETUP -->
+  <div id="screen-setup" class="screen active col center gap-24">
+    <div class="col center gap-8">
+      <a href="/" class="back-link">← Games Night</a>
+      <span style="font-size:3rem">🎤</span>
+      <h1 class="heading" style="font-size:2.2rem">Grab the Mic</h1>
+      <p style="color:var(--text-muted);font-size:0.95rem">Set up your teams, then share the room code.</p>
+    </div>
+    <div class="card col gap-16">
+      <div>
+        <div class="section-label">Number of Teams</div>
+        <div class="team-count-row">
+          <button class="count-btn" id="count-down">−</button>
+          <div class="count-num" id="team-count-display">4</div>
+          <button class="count-btn" id="count-up">+</button>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Team Names</div>
+        <div id="team-name-inputs" class="col gap-8"></div>
+      </div>
+      <button class="btn btn-reveal mt-8" id="btn-create">Create Room</button>
+      <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
+    </div>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="screen-lobby" class="screen col center gap-16">
+    <div class="lobby-code-section">
+      <div class="lobby-code-left">
+        <div class="section-label">Room Code</div>
+        <div class="room-code" id="lobby-room-code">----</div>
+        <div class="lobby-join-url" id="lobby-join-url"></div>
+        <div id="lobby-player-address" style="font-size:0.85rem;color:#34C759;font-weight:700;margin-top:6px;background:rgba(52,199,89,0.12);border-radius:8px;padding:6px 12px"></div>
+      </div>
+      <div class="qr-wrap" id="lobby-qr" style="display:none">
+        <img id="lobby-qr-img" width="160" height="160" alt="QR Code">
+      </div>
+    </div>
+    <div id="lobby-scores-section" style="display:none;width:100%;max-width:480px">
+      <div class="section-label mb-8">Scores</div>
+      <div class="score-grid" id="lobby-scores"></div>
+    </div>
+    <div style="width:100%;max-width:480px">
+      <div class="section-label mb-8">Players (<span id="player-count">0</span>)</div>
+      <div class="player-groups" id="player-groups"></div>
+    </div>
+    <div class="lobby-actions">
+      <button class="btn btn-reveal" id="btn-reveal">Reveal Word</button>
+      <button class="btn btn-ghost" id="btn-end-game-lobby" style="display:none">End Game</button>
+    </div>
+  </div>
+
+  <!-- COUNTDOWN -->
+  <div id="screen-countdown" class="screen col center gap-16">
+    <div class="word-display" id="countdown-word"></div>
+    <div class="countdown-num" id="countdown-num">3</div>
+  </div>
+
+  <!-- BUZZERS LIVE -->
+  <div id="screen-buzzers-live" class="screen col center gap-20">
+    <div class="word-display" id="live-word"></div>
+    <div class="live-indicator mt-12">
+      <div class="live-dot"></div>
+      <div class="buzzers-live-text">BUZZERS LIVE</div>
+    </div>
+    <p style="color:var(--text-muted);font-weight:600">Waiting for a buzz...</p>
+  </div>
+
+  <!-- JUDGING -->
+  <div id="screen-judging" class="screen col center gap-20">
+    <div class="word-display" id="judging-word"></div>
+    <div class="team-badge" id="judging-badge">Team Name</div>
+    <div style="font-size:1.1rem;color:var(--text-muted);font-weight:600">
+      Buzzed by <span id="judging-player" style="color:#fff;font-weight:800"></span>
+    </div>
+    <p style="font-family:'Fredoka',sans-serif;font-size:1.6rem;font-weight:600">Did they sing it?</p>
+    <div class="judge-row">
+      <button class="btn btn-green" id="btn-yes">Yes — Point!</button>
+      <button class="btn btn-red"   id="btn-nope">Nope</button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="screen-results" class="screen col center gap-16">
+    <div id="results-banner" class="result-banner"></div>
+    <div>
+      <div class="section-label mb-8">Scores</div>
+      <div class="score-grid" id="results-scores"></div>
+    </div>
+    <div class="lobby-actions">
+      <button class="btn btn-reveal" id="btn-next-word">Next Word</button>
+      <button class="btn btn-ghost"  id="btn-end-game">End Game</button>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-20">
+    <div style="font-size:3rem">🏆</div>
+    <h2 class="heading" style="font-size:2rem">Final Scores</h2>
+    <div class="leaderboard" id="final-leaderboard"></div>
+    <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/grab-the-mic/js/host.js"></script>
+</body>
+</html>

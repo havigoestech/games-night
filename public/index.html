@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Games Night</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a18;
+      color: #fff;
+      font-family: 'Nunito', sans-serif;
+      min-height: 100vh;
+      padding: 40px 20px 60px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .header .emoji { font-size: 3.5rem; display: block; margin-bottom: 12px; }
+    .header h1 {
+      font-family: 'Fredoka', sans-serif;
+      font-size: clamp(2.4rem, 8vw, 4rem);
+      font-weight: 700;
+      background: linear-gradient(135deg, #FF2D55 0%, #BF5AF2 50%, #5856D6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+      margin-bottom: 10px;
+    }
+    .header p {
+      color: rgba(255,255,255,0.5);
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .game-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 24px;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: transform 0.2s, border-color 0.2s;
+      text-decoration: none;
+      color: inherit;
+    }
+    .game-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255,255,255,0.18);
+    }
+    .game-card.coming-soon {
+      opacity: 0.45;
+      cursor: default;
+    }
+    .game-card.coming-soon:hover { transform: none; border-color: rgba(255,255,255,0.09); }
+
+    .card-icon { font-size: 2.8rem; line-height: 1; }
+    .card-tag {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      padding: 3px 10px;
+      border-radius: 20px;
+      width: fit-content;
+      margin-bottom: 2px;
+    }
+    .tag-live { background: rgba(52,199,89,0.18); color: #34C759; }
+    .tag-soon { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); }
+
+    .card-title {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    .card-desc {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.55);
+      font-weight: 600;
+      line-height: 1.5;
+      flex: 1;
+    }
+
+    .card-actions { display: flex; gap: 10px; margin-top: 8px; }
+    .btn-host {
+      flex: 1;
+      padding: 13px 16px;
+      border: none;
+      border-radius: 14px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      color: #fff;
+    }
+    .btn-host:active { transform: scale(0.97); }
+
+    .gtm-gradient  { background: linear-gradient(135deg, #FF2D55, #FF9500); }
+
+    .footer {
+      text-align: center;
+      margin-top: 56px;
+      color: rgba(255,255,255,0.2);
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <span class="emoji">🎮</span>
+    <h1>Games Night</h1>
+    <p>Pick a game and start hosting</p>
+  </header>
+
+  <div class="games-grid">
+
+    <!-- GRAB THE MIC -->
+    <div class="game-card">
+      <div class="card-icon">🎤</div>
+      <span class="card-tag tag-live">Ready to play</span>
+      <div class="card-title">Grab the Mic</div>
+      <div class="card-desc">
+        A word appears on screen. Teams race to buzz in first, then must sing a song containing that word. The host judges. First to sing it wins the point.
+      </div>
+      <div class="card-actions">
+        <button class="btn-host gtm-gradient" onclick="location.href='/games/grab-the-mic/host.html'">
+          Host Game
+        </button>
+      </div>
+    </div>
+
+    <!-- COMING SOON 1 -->
+    <div class="game-card coming-soon">
+      <div class="card-icon">🧠</div>
+      <span class="card-tag tag-soon">Coming soon</span>
+      <div class="card-title">Quiz Night</div>
+      <div class="card-desc">
+        Host reads questions. Teams buzz in to answer. Multiple categories, configurable rounds.
+      </div>
+    </div>
+
+    <!-- COMING SOON 2 -->
+    <div class="game-card coming-soon">
+      <div class="card-icon">🤔</div>
+      <span class="card-tag tag-soon">Coming soon</span>
+      <div class="card-title">Would You Rather</div>
+      <div class="card-desc">
+        Two outrageous options. Everyone votes on their phone. Results revealed live with a team breakdown.
+      </div>
+    </div>
+
+    <!-- COMING SOON 3 -->
+    <div class="game-card coming-soon">
+      <div class="card-icon">🎵</div>
+      <span class="card-tag tag-soon">Coming soon</span>
+      <div class="card-title">Name That Tune</div>
+      <div class="card-desc">
+        Host hums or plays a clip. Teams race to buzz in and name the song. Points for artist and title.
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="footer">Games Night Hub &nbsp;·&nbsp; Built for Havilah</footer>
+
+</body>
+</html>

@@ -1,0 +1,234 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg: #0a0a18;
+  --surface: rgba(255,255,255,0.06);
+  --border: rgba(255,255,255,0.08);
+  --text: #ffffff;
+  --text-muted: rgba(255,255,255,0.55);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Nunito', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
+}
+
+h1, h2, h3, .heading { font-family: 'Fredoka', sans-serif; }
+
+/* ── Cards ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+  width: 100%;
+  max-width: 480px;
+}
+
+/* ── Inputs ── */
+input[type="text"], input[type="number"] {
+  width: 100%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  color: #fff;
+  font-family: 'Nunito', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 12px 16px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+input[type="text"]:focus, input[type="number"]:focus { border-color: rgba(255,255,255,0.4); }
+input[type="text"]::placeholder { color: rgba(255,255,255,0.35); }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 14px 28px;
+  transition: transform 0.1s, opacity 0.1s;
+  width: 100%;
+}
+.btn:active { transform: scale(0.96); }
+.btn-primary  { background: linear-gradient(135deg, #5856D6, #BF5AF2); color: #fff; }
+.btn-green    { background: #34C759; color: #fff; font-size: 1.3rem; padding: 18px 32px; }
+.btn-red      { background: #FF2D55; color: #fff; font-size: 1.3rem; padding: 18px 32px; }
+.btn-ghost    { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.7); font-size: 0.95rem; padding: 12px 24px; }
+.btn-reveal   { background: linear-gradient(135deg, #FF9500, #FF2D55); color: #fff; font-size: 1.4rem; padding: 20px 40px; border-radius: 20px; letter-spacing: 0.03em; }
+
+/* ── Room code ── */
+.room-code {
+  font-family: 'Fredoka', sans-serif;
+  font-size: clamp(64px, 16vw, 120px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  background: linear-gradient(135deg, #fff 30%, rgba(255,255,255,0.6));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Word display ── */
+.word-display {
+  font-family: 'Fredoka', sans-serif;
+  font-size: clamp(56px, 14vw, 96px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  color: #fff;
+  text-shadow: 0 0 40px rgba(255,255,255,0.2);
+}
+
+/* ── Countdown ── */
+.countdown-num {
+  font-family: 'Fredoka', sans-serif;
+  font-size: clamp(96px, 24vw, 160px);
+  font-weight: 700;
+  line-height: 1;
+  color: #FF2D55;
+  text-shadow: 0 0 60px rgba(255,45,85,0.5);
+  animation: pulse-count 1s ease-in-out;
+}
+.countdown-num.go { color: #34C759; text-shadow: 0 0 60px rgba(52,199,89,0.6); animation: pop-in 0.3s ease-out; }
+
+@keyframes pulse-count {
+  0%   { transform: scale(1.4); opacity: 0; }
+  40%  { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes pop-in {
+  0%   { transform: scale(0.5); opacity: 0; }
+  70%  { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── Score cards ── */
+.score-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+  width: 100%;
+  max-width: 560px;
+}
+.score-card { border-radius: 14px; padding: 12px 10px; text-align: center; }
+.score-card .team-name { font-size: 0.8rem; font-weight: 700; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.score-card .score-num { font-family: 'Fredoka', sans-serif; font-size: 2rem; font-weight: 700; line-height: 1.1; }
+
+/* ── Team badge ── */
+.team-badge {
+  border-radius: 20px;
+  padding: 20px 32px;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  animation: glow-in 0.4s ease-out;
+}
+@keyframes glow-in {
+  0%   { transform: scale(0.8); opacity: 0; }
+  60%  { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── Pulsing live dot ── */
+.live-dot { width: 14px; height: 14px; border-radius: 50%; background: #34C759; display: inline-block; animation: pulse-dot 1.2s ease-in-out infinite; }
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.5); opacity: 0.6; }
+}
+
+/* ── Player list ── */
+.player-groups { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; max-height: 260px; overflow-y: auto; }
+.player-group { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; text-align: left; }
+.player-group-header { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.player-group-members { font-size: 0.9rem; color: var(--text-muted); font-weight: 500; }
+
+/* ── Leaderboard ── */
+.leaderboard { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 8px; }
+.lb-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); }
+.lb-rank { font-family: 'Fredoka', sans-serif; font-size: 1.3rem; font-weight: 700; width: 32px; text-align: center; }
+.lb-name { flex: 1; font-weight: 700; text-align: left; }
+.lb-score { font-family: 'Fredoka', sans-serif; font-size: 1.5rem; font-weight: 700; }
+.lb-row.winner { border-width: 2px; }
+
+/* ── Team colour inputs ── */
+.team-input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.team-dot { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Landing ── */
+.landing-logo { font-family: 'Fredoka', sans-serif; font-size: clamp(40px, 10vw, 72px); font-weight: 700; background: linear-gradient(135deg, #FF2D55, #BF5AF2, #5856D6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px; }
+.landing-sub { color: var(--text-muted); font-size: 1rem; font-weight: 600; margin-bottom: 40px; }
+.landing-btns { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 360px; }
+
+/* ── QR code ── */
+.qr-wrap { background: #0a0a18; border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 12px; display: inline-block; }
+.qr-wrap img { display: block; border-radius: 8px; }
+
+/* ── Large room code input ── */
+.room-code-input { font-family: 'Fredoka', sans-serif !important; font-size: 2rem !important; letter-spacing: 0.3em !important; text-align: center !important; text-transform: uppercase; padding: 16px !important; }
+
+/* ── Full-screen buzzer ── */
+#buzzer-fullscreen {
+  position: fixed; inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  user-select: none; -webkit-user-select: none;
+  z-index: 100;
+}
+#buzzer-fullscreen.active { display: flex; }
+#buzzer-fullscreen .buzz-emoji  { font-size: 5rem; margin-bottom: 12px; pointer-events: none; }
+#buzzer-fullscreen .buzz-label  { font-family: 'Fredoka', sans-serif; font-size: clamp(48px, 14vw, 80px); font-weight: 700; pointer-events: none; color: #fff; }
+#buzzer-fullscreen .buzz-hint   { font-size: 1rem; font-weight: 700; opacity: 0.65; pointer-events: none; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 8px; }
+
+/* ── Waiting screen ── */
+#screen-waiting { transition: background 0.5s; }
+
+/* ── Error text ── */
+.error-msg { color: #FF2D55; font-size: 0.9rem; font-weight: 700; margin-top: 8px; min-height: 1.2em; }
+
+/* ── Utilities (must come before .screen so display:none wins) ── */
+.gap-8  { gap: 8px;  } .gap-12 { gap: 12px; } .gap-16 { gap: 16px; } .gap-20 { gap: 20px; } .gap-24 { gap: 24px; }
+.mt-8   { margin-top: 8px;    } .mt-12  { margin-top: 12px;   } .mt-16  { margin-top: 16px;   } .mt-20  { margin-top: 20px; } .mt-24  { margin-top: 24px; }
+.mb-8   { margin-bottom: 8px; } .mb-16  { margin-bottom: 16px;} .mb-24  { margin-bottom: 24px;}
+.w-full { width: 100%; }
+.col    { display: flex; flex-direction: column; }
+.row    { display: flex; flex-direction: row; }
+.center { align-items: center; justify-content: center; }
+
+/* ── Screens (after .col/.row so display:none wins the cascade) ── */
+.screen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100vh;
+  padding: 24px 20px;
+  overflow-y: auto;
+  text-align: center;
+}
+.screen.active { display: flex; }
+
+@media (min-width: 768px) {
+  .score-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .screen { padding: 40px 32px; }
+}

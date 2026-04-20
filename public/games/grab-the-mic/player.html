@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Grab the Mic</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .join-logo { font-family: 'Fredoka', sans-serif; font-size: 2rem; font-weight: 700; margin-bottom: 4px; }
+    .team-btn { width: 100%; padding: 16px 20px; border-radius: 16px; border: 2px solid transparent; font-family: 'Fredoka', sans-serif; font-size: 1.2rem; font-weight: 700; cursor: pointer; color: #fff; transition: transform 0.1s; text-align: center; }
+    .team-btn:active { transform: scale(0.97); }
+    .team-btn.dark-text { color: #111 !important; }
+    #screen-waiting { background: radial-gradient(ellipse at center, rgba(255,255,255,0.1) 0%, var(--bg) 70%); }
+    .waiting-team-badge { font-family: 'Fredoka', sans-serif; font-size: 1.4rem; font-weight: 700; padding: 10px 24px; border-radius: 14px; letter-spacing: 0.03em; }
+    .waiting-label { font-size: 1.1rem; color: rgba(255,255,255,0.7); font-weight: 600; margin-top: 8px; }
+    .get-ready-text { color: rgba(255,255,255,0.6); font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
+    .buzzed-label { font-family: 'Fredoka', sans-serif; font-size: clamp(32px, 10vw, 56px); font-weight: 700; }
+    .buzzed-sub { font-size: 1rem; font-weight: 600; opacity: 0.7; margin-top: 8px; }
+    #screen-result .result-team-badge { font-family: 'Fredoka', sans-serif; font-size: 1.5rem; font-weight: 700; padding: 14px 28px; border-radius: 16px; margin-bottom: 8px; }
+    #screen-result .result-msg { font-size: 1rem; color: rgba(255,255,255,0.7); font-weight: 600; }
+    #screen-game-over { justify-content: flex-start; padding-top: 40px; }
+    #screen-host-disconnected { position: fixed; inset: 0; background: var(--bg); z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+    #screen-host-disconnected.active { display: flex; }
+  </style>
+</head>
+<body>
+
+  <!-- JOIN -->
+  <div id="screen-join" class="screen active col center gap-20">
+    <div class="col center gap-4">
+      <span style="font-size:2.5rem">🎤</span>
+      <div class="join-logo">Grab the Mic</div>
+    </div>
+    <div class="card col gap-12" style="max-width:360px">
+      <div>
+        <div style="font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:6px">Your Name</div>
+        <input type="text" id="input-name" placeholder="Enter your name" maxlength="20" autocomplete="off">
+      </div>
+      <div>
+        <div style="font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:6px">Room Code</div>
+        <input type="text" id="input-room" class="room-code-input" placeholder="ABCD" maxlength="4" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="error-msg" id="join-error"></div>
+      <button class="btn btn-primary mt-8" id="btn-join">Join Game</button>
+    </div>
+  </div>
+
+  <!-- TEAM SELECT -->
+  <div id="screen-team-select" class="screen col center gap-16">
+    <div class="col center gap-4">
+      <h2 class="heading" style="font-size:1.8rem">Pick Your Team</h2>
+      <p style="color:var(--text-muted);font-size:0.9rem;font-weight:600">Choose the team you want to join</p>
+    </div>
+    <div id="team-buttons" class="col gap-10" style="width:100%;max-width:360px"></div>
+  </div>
+
+  <!-- WAITING -->
+  <div id="screen-waiting" class="screen col center gap-16">
+    <div class="waiting-team-badge" id="waiting-team-badge">Team Name</div>
+    <div class="waiting-label">Waiting for next word...</div>
+    <div style="margin-top:8px;width:100%;max-width:360px">
+      <div style="font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin-bottom:8px;text-align:center">Scores</div>
+      <div class="score-grid" id="waiting-scores"></div>
+    </div>
+  </div>
+
+  <!-- WORD + COUNTDOWN -->
+  <div id="screen-word-countdown" class="screen col center gap-20">
+    <div class="get-ready-text">Get ready...</div>
+    <div class="word-display" id="player-word"></div>
+    <div class="countdown-num" id="player-countdown">3</div>
+  </div>
+
+  <!-- FULL-SCREEN BUZZER -->
+  <div id="buzzer-fullscreen">
+    <div class="buzz-emoji">🔴</div>
+    <div class="buzz-label">BUZZ!</div>
+    <div class="buzz-hint">Tap anywhere</div>
+  </div>
+
+  <!-- BUZZED -->
+  <div id="screen-buzzed" class="screen col center gap-12">
+    <span style="font-size:3.5rem">🎤</span>
+    <div class="buzzed-label">YOU BUZZED!</div>
+    <div class="buzzed-sub">Waiting for host judgement...</div>
+  </div>
+
+  <!-- SOMEONE ELSE BUZZED -->
+  <div id="screen-someone-buzzed" class="screen col center gap-12">
+    <span style="font-size:3rem">⚡</span>
+    <div style="font-family:'Fredoka',sans-serif;font-size:1.8rem;font-weight:700" id="sb-team-name">Team Name</div>
+    <div style="color:rgba(255,255,255,0.6);font-weight:600">buzzed first</div>
+    <div style="font-weight:700;font-size:1.1rem" id="sb-player-name"></div>
+    <div style="color:rgba(255,255,255,0.5);font-size:0.9rem;margin-top:8px;font-weight:600">Waiting for host judgement...</div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="screen-result" class="screen col center gap-16">
+    <div class="col center gap-12">
+      <div class="result-team-badge" id="result-team-badge"></div>
+      <div class="result-msg" id="result-msg"></div>
+    </div>
+    <div style="width:100%;max-width:360px">
+      <div style="font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin-bottom:8px;text-align:center">Scores</div>
+      <div class="score-grid" id="result-scores"></div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-20">
+    <div style="font-size:3rem">🏆</div>
+    <h2 class="heading" style="font-size:2rem">Game Over!</h2>
+    <div class="leaderboard" id="player-final-leaderboard"></div>
+    <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <!-- HOST DISCONNECTED -->
+  <div id="screen-host-disconnected">
+    <span style="font-size:3rem">😴</span>
+    <h2 class="heading" style="font-size:1.8rem">Host Disconnected</h2>
+    <p style="color:var(--text-muted);font-weight:600">The host has left the game.</p>
+    <button class="btn btn-ghost" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/grab-the-mic/js/player.js"></script>
+</body>
+</html>
