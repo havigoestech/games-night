@@ -39,6 +39,7 @@ document.getElementById('btn-join').addEventListener('click', doJoin);
 );
 
 function doJoin() {
+  Sounds.unlockAudio();
   const name = document.getElementById('input-name').value.trim();
   const room = document.getElementById('input-room').value.trim().toUpperCase();
   const err  = document.getElementById('join-error');
@@ -101,6 +102,7 @@ socket.on('joined', ({ teamIndex, teamNames: names, teamColors: colors, scores, 
 
 // ── Game flow ─────────────────────────────────────────────────
 socket.on('word-reveal', ({ word }) => {
+  Sounds.wordReveal();
   document.getElementById('player-word').textContent = word;
   const numEl = document.getElementById('player-countdown');
   numEl.className = 'countdown-num';
@@ -109,6 +111,7 @@ socket.on('word-reveal', ({ word }) => {
 });
 
 socket.on('countdown', ({ seconds }) => {
+  Sounds.tick(false);
   const numEl = document.getElementById('player-countdown');
   numEl.className = 'countdown-num';
   void numEl.offsetWidth;
@@ -116,6 +119,7 @@ socket.on('countdown', ({ seconds }) => {
 });
 
 socket.on('buzzers-live', () => {
+  Sounds.go();
   const numEl = document.getElementById('player-countdown');
   numEl.className = 'countdown-num go';
   numEl.textContent = 'GO!';
@@ -127,6 +131,7 @@ document.getElementById('buzzer-fullscreen').addEventListener('pointerdown', (e)
   e.preventDefault();
   if (buzzerFired) return;
   buzzerFired = true;
+  Sounds.buzz();
   const subEl = document.getElementById('buzzed-sub-text');
   if (subEl) subEl.textContent = 'Sing it now!';
   const countEl = document.getElementById('buzz-countdown');
@@ -141,6 +146,7 @@ socket.on('you-buzzed', ({ singingTime }) => {
 });
 
 socket.on('singing-timer', ({ secondsLeft }) => {
+  if (secondsLeft <= 5) Sounds.tick(secondsLeft <= 3);
   const el = document.getElementById('buzz-countdown');
   if (!el) return;
   el.textContent = secondsLeft;
@@ -148,6 +154,7 @@ socket.on('singing-timer', ({ secondsLeft }) => {
 });
 
 socket.on('singing-timeout', () => {
+  Sounds.timeUp();
   const el = document.getElementById('buzz-countdown');
   if (el) { el.textContent = '0'; el.className = 'buzz-countdown danger'; }
   const subEl = document.getElementById('buzzed-sub-text');
@@ -165,6 +172,7 @@ socket.on('someone-buzzed', ({ teamName, teamColor, playerName }) => {
 
 // ── Results ───────────────────────────────────────────────────
 socket.on('round-complete', ({ scores, awarded, winnerTeamName, winnerTeamColor, winnerName }) => {
+  if (awarded) Sounds.pointAwarded(); else Sounds.noPoint();
   renderScoreCards('result-scores', scores);
 
   const badge = document.getElementById('result-team-badge');
@@ -193,6 +201,7 @@ socket.on('round-complete', ({ scores, awarded, winnerTeamName, winnerTeamColor,
 });
 
 socket.on('game-over', ({ scores }) => {
+  Sounds.gameOver();
   renderLeaderboard('player-final-leaderboard', scores);
   showScreen('screen-game-over');
 });

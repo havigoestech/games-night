@@ -44,6 +44,7 @@ document.getElementById('count-up').addEventListener('click', () => {
 });
 
 document.getElementById('btn-create').addEventListener('click', () => {
+  Sounds.unlockAudio();
   const btn = document.getElementById('btn-create');
   btn.textContent = 'Creating...';
   btn.disabled = true;
@@ -153,6 +154,7 @@ document.getElementById('btn-end-game-lobby').addEventListener('click', () => {
 
 // ── Countdown ─────────────────────────────────────────────────
 socket.on('word-reveal', ({ word }) => {
+  Sounds.wordReveal();
   currentWord = word;
   document.getElementById('countdown-word').textContent = word;
   const numEl = document.getElementById('countdown-num');
@@ -162,6 +164,7 @@ socket.on('word-reveal', ({ word }) => {
 });
 
 socket.on('countdown', ({ seconds }) => {
+  Sounds.tick(false);
   const numEl = document.getElementById('countdown-num');
   numEl.className = 'countdown-num';
   void numEl.offsetWidth;
@@ -169,6 +172,7 @@ socket.on('countdown', ({ seconds }) => {
 });
 
 socket.on('buzzers-live', () => {
+  Sounds.go();
   const numEl = document.getElementById('countdown-num');
   numEl.className = 'countdown-num go';
   numEl.textContent = 'GO!';
@@ -180,6 +184,7 @@ socket.on('buzzers-live', () => {
 
 // ── Judging ───────────────────────────────────────────────────
 socket.on('player-buzzed', ({ teamName, teamColor, playerName, singingTime }) => {
+  Sounds.buzz();
   const badge = document.getElementById('judging-badge');
   const isGold = teamColor === '#FFD60A';
   badge.textContent = teamName;
@@ -194,6 +199,7 @@ socket.on('player-buzzed', ({ teamName, teamColor, playerName, singingTime }) =>
 });
 
 socket.on('singing-timer', ({ secondsLeft }) => {
+  Sounds.tick(secondsLeft <= 3);
   const el = document.getElementById('judging-countdown');
   if (!el) return;
   el.textContent = secondsLeft;
@@ -201,14 +207,15 @@ socket.on('singing-timer', ({ secondsLeft }) => {
 });
 
 socket.on('singing-timeout', () => {
+  Sounds.timeUp();
   const el = document.getElementById('judging-countdown');
   if (el) { el.textContent = '0'; el.className = 'singing-countdown danger'; }
   const banner = document.getElementById('time-up-banner');
   if (banner) banner.style.display = 'block';
 });
 
-document.getElementById('btn-yes').addEventListener('click',  () => socket.emit('judge', { awarded: true }));
-document.getElementById('btn-nope').addEventListener('click', () => socket.emit('judge', { awarded: false }));
+document.getElementById('btn-yes').addEventListener('click',  () => { Sounds.pointAwarded(); socket.emit('judge', { awarded: true }); });
+document.getElementById('btn-nope').addEventListener('click', () => { Sounds.noPoint();      socket.emit('judge', { awarded: false }); });
 
 // ── Results ───────────────────────────────────────────────────
 socket.on('round-complete', ({ scores, awarded, winnerTeamName }) => {
@@ -239,6 +246,7 @@ document.getElementById('btn-end-game').addEventListener('click', () => {
 
 // ── Game over ─────────────────────────────────────────────────
 socket.on('game-over', ({ scores }) => {
+  Sounds.gameOver();
   renderLeaderboard('final-leaderboard', scores);
   showScreen('screen-game-over');
 });
