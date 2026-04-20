@@ -19,6 +19,8 @@
     .buzz-countdown { font-family: 'Fredoka', sans-serif; font-size: 4rem; font-weight: 700; color: #34C759; transition: color 0.3s; }
     .buzz-countdown.warning { color: #FF9500; }
     .buzz-countdown.danger { color: #FF2D55; }
+    #buzzer-fullscreen.buzzer-pending { opacity: 0.75; transition: opacity 0.1s; }
+    #buzzer-fullscreen.buzzer-pending .buzz-hint { letter-spacing: 0.05em; }
     #screen-result .result-team-badge { font-family: 'Fredoka', sans-serif; font-size: 1.5rem; font-weight: 700; padding: 14px 28px; border-radius: 16px; margin-bottom: 8px; }
     #screen-result .result-msg { font-size: 1rem; color: rgba(255,255,255,0.7); font-weight: 600; }
     #screen-game-over { justify-content: flex-start; padding-top: 40px; }
@@ -78,7 +80,7 @@
   <div id="buzzer-fullscreen">
     <div class="buzz-emoji">🔴</div>
     <div class="buzz-label">BUZZ!</div>
-    <div class="buzz-hint">Tap anywhere</div>
+    <div class="buzz-hint" id="buzz-hint-text">Tap anywhere</div>
   </div>
 
   <!-- BUZZED -->

@@ -20,7 +20,10 @@ function showBuzzer() {
   const buzzer = document.getElementById('buzzer-fullscreen');
   buzzer.style.background = myTeamColor;
   buzzer.style.color = myTeamColor === '#FFD60A' ? '#111' : '#fff';
+  buzzer.classList.remove('buzzer-pending');
   buzzer.classList.add('active');
+  const hintEl = document.getElementById('buzz-hint-text');
+  if (hintEl) hintEl.textContent = 'Tap anywhere';
   buzzerFired = false;
 }
 
@@ -132,17 +135,31 @@ document.getElementById('buzzer-fullscreen').addEventListener('pointerdown', (e)
   if (buzzerFired) return;
   buzzerFired = true;
   Sounds.buzz();
-  const subEl = document.getElementById('buzzed-sub-text');
-  if (subEl) subEl.textContent = 'Sing it now!';
-  const countEl = document.getElementById('buzz-countdown');
-  if (countEl) { countEl.textContent = ''; countEl.className = 'buzz-countdown'; }
-  showScreen('screen-buzzed');
+  // Stay on buzzer screen — go pending. Only navigate once server confirms who won.
+  const buzzer = document.getElementById('buzzer-fullscreen');
+  buzzer.classList.add('buzzer-pending');
+  const hintEl = document.getElementById('buzz-hint-text');
+  if (hintEl) hintEl.textContent = 'Buzzing...';
   socket.emit('buzz');
+  // Safety reset: if server never responds within 2 s, unlock the buzzer
+  setTimeout(() => {
+    if (buzzerFired && buzzer.classList.contains('buzzer-pending')) {
+      buzzer.classList.remove('buzzer-pending');
+      if (hintEl) hintEl.textContent = 'Tap anywhere';
+      buzzerFired = false;
+    }
+  }, 2000);
 }, { passive: false });
 
 socket.on('you-buzzed', ({ singingTime }) => {
+  // Server confirmed — we won the race
+  const buzzer = document.getElementById('buzzer-fullscreen');
+  buzzer.classList.remove('buzzer-pending');
+  const subEl = document.getElementById('buzzed-sub-text');
+  if (subEl) subEl.textContent = 'Sing it now!';
   const el = document.getElementById('buzz-countdown');
   if (el) { el.textContent = singingTime || 10; el.className = 'buzz-countdown'; }
+  showScreen('screen-buzzed');
 });
 
 socket.on('singing-timer', ({ secondsLeft }) => {
@@ -163,7 +180,9 @@ socket.on('singing-timeout', () => {
 
 socket.on('someone-buzzed', ({ teamName, teamColor, playerName }) => {
   const buzzer = document.getElementById('buzzer-fullscreen');
+  // Respond if we're still on the buzzer screen — whether we tapped (pending) or haven't tapped yet
   if (!buzzer.classList.contains('active')) return;
+  buzzer.classList.remove('buzzer-pending');
   document.getElementById('sb-team-name').textContent = teamName;
   document.getElementById('sb-team-name').style.color  = teamColor;
   document.getElementById('sb-player-name').textContent = playerName;
