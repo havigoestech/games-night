@@ -114,6 +114,7 @@
     .btn-host:active { transform: scale(0.97); }
 
     .gtm-gradient  { background: linear-gradient(135deg, #FF2D55, #FF9500); }
+    .ff-gradient   { background: linear-gradient(135deg, #FF9500, #FFD60A); }
 
     .footer {
       text-align: center;
@@ -149,13 +150,18 @@
       </div>
     </div>
 
-    <!-- COMING SOON 1 -->
-    <div class="game-card coming-soon">
-      <div class="card-icon">🧠</div>
-      <span class="card-tag tag-soon">Coming soon</span>
-      <div class="card-title">Quiz Night</div>
+    <!-- FAMILY FEUD -->
+    <div class="game-card">
+      <div class="card-icon">🎯</div>
+      <span class="card-tag tag-live">Ready to play</span>
+      <div class="card-title">Family Feud</div>
       <div class="card-desc">
-        Host reads questions. Teams buzz in to answer. Multiple categories, configurable rounds.
+        Survey says! Teams compete to name the most popular answers to everyday questions. Buzz in, give your answer, bank the points — or risk a steal.
+      </div>
+      <div class="card-actions">
+        <button class="btn-host ff-gradient" id="btn-ff" onclick="location.href='/games/family-feud/host.html'">
+          Host Game
+        </button>
       </div>
     </div>
 

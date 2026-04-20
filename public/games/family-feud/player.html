@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Family Feud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Join */
+    .join-logo { font-family: 'Fredoka', sans-serif; font-size: 2rem; font-weight: 700; margin-bottom: 4px; }
+    .team-btn { width: 100%; padding: 16px 20px; border-radius: 16px; border: 2px solid transparent; font-family: 'Fredoka', sans-serif; font-size: 1.2rem; font-weight: 700; cursor: pointer; color: #fff; transition: transform 0.1s; text-align: center; }
+    .team-btn:active { transform: scale(0.97); }
+    .team-btn.dark-text { color: #111 !important; }
+
+    /* Waiting */
+    .waiting-team-badge { font-family: 'Fredoka', sans-serif; font-size: 1.4rem; font-weight: 700; padding: 10px 24px; border-radius: 14px; letter-spacing: 0.03em; }
+    .waiting-label { font-size: 1.1rem; color: rgba(255,255,255,0.7); font-weight: 600; margin-top: 8px; }
+    #screen-waiting { transition: background 0.5s; }
+
+    /* Game screen */
+    #screen-game { justify-content: flex-start; padding-top: 16px; overflow-y: auto; }
+    .player-game-inner { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+
+    /* Question */
+    #player-question {
+      font-family: 'Fredoka', sans-serif;
+      font-size: clamp(1rem, 4vw, 1.3rem);
+      font-weight: 700;
+      color: #fff;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      padding: 12px 16px;
+      text-align: center;
+      width: 100%;
+      line-height: 1.4;
+    }
+
+    /* Active team indicator */
+    #player-active-team {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.55);
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+
+    /* Mini board */
+    #player-board {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 6px;
+      width: 100%;
+    }
+    .player-ff-tile {
+      height: 52px;
+      perspective: 400px;
+    }
+    .player-ff-tile-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .player-ff-tile.revealed .player-ff-tile-inner {
+      transform: rotateY(180deg);
+    }
+    .player-ff-tile-front, .player-ff-tile-back {
+      position: absolute;
+      inset: 0;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    .player-ff-tile-front {
+      background: #1a3a6b;
+      color: rgba(255,255,255,0.4);
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+    .player-ff-tile-back {
+      background: #1e5c34;
+      color: #FFD60A;
+      transform: rotateY(180deg);
+      padding: 4px 6px;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .player-ff-tile-back .p-answer-text {
+      font-size: 0.55rem;
+      font-weight: 700;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .player-ff-tile-back .p-answer-pts {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    /* Strikes */
+    #player-strikes {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #FF2D55;
+      text-align: center;
+      min-height: 2.2rem;
+    }
+
+    /* Steal indicator */
+    #player-steal-indicator {
+      display: none;
+      background: rgba(255,149,0,0.15);
+      border: 1px solid #FF9500;
+      border-radius: 12px;
+      padding: 10px 16px;
+      text-align: center;
+      width: 100%;
+    }
+    #player-steal-indicator.visible { display: block; }
+    #player-steal-indicator .steal-label { font-family: 'Fredoka', sans-serif; font-size: 1.1rem; font-weight: 700; color: #FF9500; }
+    #player-steal-indicator .steal-sub { font-size: 0.8rem; color: rgba(255,255,255,0.6); font-weight: 600; margin-top: 3px; }
+
+    /* Scores */
+    #player-scores { width: 100%; }
+
+    /* Buzz button (inline fallback) */
+    #player-buzz-btn {
+      width: 100%;
+      max-width: 300px;
+      padding: 18px 24px;
+      border: none;
+      border-radius: 20px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: #FF2D55;
+      color: #fff;
+      display: none;
+      animation: buzz-pulse 1.2s ease-in-out infinite;
+    }
+    #player-buzz-btn.visible { display: block; }
+    @keyframes buzz-pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,45,85,0.5); }
+      50% { transform: scale(1.03); box-shadow: 0 0 0 12px rgba(255,45,85,0); }
+    }
+
+    /* Full-screen buzzer */
+    #buzzer-fullscreen.buzzer-pending { opacity: 0.75; }
+    #buzzer-fullscreen.buzzer-pending .buzz-hint { letter-spacing: 0.05em; }
+
+    /* Buzzed screen */
+    .buzzed-label { font-family: 'Fredoka', sans-serif; font-size: clamp(32px, 10vw, 56px); font-weight: 700; }
+    .buzzed-sub { font-size: 1rem; font-weight: 600; opacity: 0.7; margin-top: 8px; }
+
+    /* Round over */
+    #screen-round-over { justify-content: flex-start; padding-top: 24px; overflow-y: auto; }
+    .player-ro-inner { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .player-winner-badge { font-family: 'Fredoka', sans-serif; font-size: 1.5rem; font-weight: 700; padding: 12px 24px; border-radius: 16px; text-align: center; }
+    #player-reveal-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; width: 100%; }
+    .player-ro-tile { background: #1e5c34; border-radius: 10px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .player-ro-tile-text { font-size: 0.72rem; font-weight: 700; color: #FFD60A; flex: 1; line-height: 1.3; text-align: left; }
+    .player-ro-tile-pts { font-family: 'Fredoka', sans-serif; font-size: 1.1rem; font-weight: 700; color: #FFD60A; flex-shrink: 0; }
+
+    /* Game over */
+    #screen-game-over { justify-content: flex-start; padding-top: 40px; }
+
+    /* Host disconnected */
+    #screen-host-disconnected { position: fixed; inset: 0; background: var(--bg); z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+    #screen-host-disconnected.active { display: flex; }
+  </style>
+</head>
+<body>
+
+  <!-- JOIN -->
+  <div id="screen-join" class="screen active col center gap-20">
+    <div class="col center gap-4">
+      <span style="font-size:2.5rem">🎯</span>
+      <div class="join-logo">Family Feud</div>
+    </div>
+    <div class="card col gap-12" style="max-width:360px">
+      <div>
+        <div style="font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:6px">Your Name</div>
+        <input type="text" id="input-name" placeholder="Enter your name" maxlength="20" autocomplete="off">
+      </div>
+      <div>
+        <div style="font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:6px">Room Code</div>
+        <input type="text" id="input-room" class="room-code-input" placeholder="ABCD" maxlength="4" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="error-msg" id="join-error"></div>
+      <button class="btn btn-primary mt-8" id="btn-join">Join Game</button>
+    </div>
+  </div>
+
+  <!-- TEAM SELECT -->
+  <div id="screen-team-select" class="screen col center gap-16">
+    <div class="col center gap-4">
+      <h2 class="heading" style="font-size:1.8rem">Pick Your Team</h2>
+      <p style="color:var(--text-muted);font-size:0.9rem;font-weight:600">Choose the team you want to join</p>
+    </div>
+    <div id="team-buttons" class="col gap-10" style="width:100%;max-width:360px"></div>
+  </div>
+
+  <!-- WAITING -->
+  <div id="screen-waiting" class="screen col center gap-16">
+    <div class="waiting-team-badge" id="waiting-team-badge">Team Name</div>
+    <div class="waiting-label">Waiting for game to start...</div>
+    <div style="margin-top:8px;width:100%;max-width:360px">
+      <div style="font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin-bottom:8px;text-align:center">Scores</div>
+      <div class="score-grid" id="waiting-scores"></div>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="screen-game" class="screen col center gap-0">
+    <div class="player-game-inner">
+      <div id="player-question">Question</div>
+      <div id="player-active-team"></div>
+      <div id="player-board"></div>
+      <div id="player-strikes"></div>
+      <div id="player-steal-indicator">
+        <div class="steal-label" id="player-steal-label">STEAL!</div>
+        <div class="steal-sub" id="player-steal-sub"></div>
+      </div>
+      <div class="score-grid" id="player-scores"></div>
+      <button class="btn btn-primary" id="player-buzz-btn" style="width:100%;max-width:300px">BUZZ IN</button>
+    </div>
+  </div>
+
+  <!-- FULL-SCREEN BUZZER -->
+  <div id="buzzer-fullscreen">
+    <div class="buzz-emoji">🎯</div>
+    <div class="buzz-label">BUZZ!</div>
+    <div class="buzz-hint" id="buzz-hint-text">Tap anywhere</div>
+  </div>
+
+  <!-- BUZZED (you) -->
+  <div id="screen-buzzed" class="screen col center gap-12">
+    <span style="font-size:3.5rem">🎯</span>
+    <div class="buzzed-label">YOU BUZZED!</div>
+    <div class="buzzed-sub">Say your answer out loud!</div>
+  </div>
+
+  <!-- SOMEONE ELSE BUZZED -->
+  <div id="screen-someone-buzzed" class="screen col center gap-12">
+    <span style="font-size:3rem">⚡</span>
+    <div style="font-family:'Fredoka',sans-serif;font-size:1.8rem;font-weight:700" id="sb-team-name">Team Name</div>
+    <div style="color:rgba(255,255,255,0.6);font-weight:600">buzzed first</div>
+    <div style="font-weight:700;font-size:1.1rem" id="sb-player-name"></div>
+    <div style="color:rgba(255,255,255,0.5);font-size:0.9rem;margin-top:8px;font-weight:600">Waiting for host...</div>
+  </div>
+
+  <!-- ROUND OVER -->
+  <div id="screen-round-over" class="screen col center gap-0">
+    <div class="player-ro-inner">
+      <div style="font-size:1.8rem">🎉</div>
+      <div class="player-winner-badge" id="player-round-winner-badge"></div>
+      <div id="player-round-pts-text" style="font-family:'Fredoka',sans-serif;font-size:1rem;color:rgba(255,255,255,0.65);font-weight:600"></div>
+      <div style="width:100%">
+        <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin-bottom:8px;text-align:center">All Answers</div>
+        <div id="player-reveal-board"></div>
+      </div>
+      <div style="width:100%">
+        <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin-bottom:8px;text-align:center">Scores</div>
+        <div class="score-grid" id="player-ro-scores"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-20">
+    <div style="font-size:3rem">🏆</div>
+    <h2 class="heading" style="font-size:2rem">Game Over!</h2>
+    <div class="leaderboard" id="player-final-leaderboard"></div>
+    <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <!-- HOST DISCONNECTED -->
+  <div id="screen-host-disconnected">
+    <span style="font-size:3rem">😴</span>
+    <h2 class="heading" style="font-size:1.8rem">Host Disconnected</h2>
+    <p style="color:var(--text-muted);font-weight:600">The host has left the game.</p>
+    <button class="btn btn-ghost" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/family-feud/js/sounds.js"></script>
+  <script src="/games/family-feud/js/player.js"></script>
+</body>
+</html>
