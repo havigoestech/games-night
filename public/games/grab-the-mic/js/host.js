@@ -6,6 +6,7 @@ let teamCount = 4;
 let allPlayers = [];
 let currentScores = [];
 let currentWord = '';
+let selectedSingingTime = 10;
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -52,12 +53,20 @@ document.getElementById('btn-create').addEventListener('click', () => {
     const el = document.getElementById(`team-name-${i}`);
     return el ? el.value.trim() : '';
   });
-  socket.emit('create-room', { teamCount, teamNames, baseUrl: `${location.protocol}//${location.host}` });
+  socket.emit('create-room', { teamCount, teamNames, baseUrl: `${location.protocol}//${location.host}`, singingTime: selectedSingingTime });
 
   setTimeout(() => { btn.textContent = 'Create Room'; btn.disabled = false; dbg(''); }, 8000);
 });
 
 renderTeamInputs();
+
+document.querySelectorAll('.timer-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.timer-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedSingingTime = parseInt(btn.dataset.seconds);
+  });
+});
 
 // ── Lobby ──────────────────────────────────────────────────────
 socket.on('room-created', (data) => {
@@ -170,14 +179,28 @@ socket.on('buzzers-live', () => {
 });
 
 // ── Judging ───────────────────────────────────────────────────
-socket.on('player-buzzed', ({ teamName, teamColor, playerName }) => {
+socket.on('player-buzzed', ({ teamName, teamColor, playerName, singingTime }) => {
   const badge = document.getElementById('judging-badge');
   const isGold = teamColor === '#FFD60A';
   badge.textContent = teamName;
   badge.style.cssText = `background:${teamColor};color:${isGold ? '#111' : '#fff'};box-shadow:0 0 40px ${teamColor}88`;
   document.getElementById('judging-player').textContent = playerName;
   document.getElementById('judging-word').textContent = currentWord;
+  const countEl = document.getElementById('judging-countdown');
+  if (countEl) { countEl.textContent = singingTime || 10; countEl.className = 'singing-countdown'; }
   showScreen('screen-judging');
+});
+
+socket.on('singing-timer', ({ secondsLeft }) => {
+  const el = document.getElementById('judging-countdown');
+  if (!el) return;
+  el.textContent = secondsLeft;
+  el.className = 'singing-countdown' + (secondsLeft <= 3 ? ' danger' : secondsLeft <= 5 ? ' warning' : '');
+});
+
+socket.on('singing-timeout', () => {
+  const el = document.getElementById('judging-countdown');
+  if (el) { el.textContent = '0'; el.className = 'singing-countdown danger'; }
 });
 
 document.getElementById('btn-yes').addEventListener('click',  () => socket.emit('judge', { awarded: true }));

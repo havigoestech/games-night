@@ -127,9 +127,32 @@ document.getElementById('buzzer-fullscreen').addEventListener('pointerdown', (e)
   e.preventDefault();
   if (buzzerFired) return;
   buzzerFired = true;
+  const subEl = document.getElementById('buzzed-sub-text');
+  if (subEl) subEl.textContent = 'Sing it now!';
+  const countEl = document.getElementById('buzz-countdown');
+  if (countEl) { countEl.textContent = ''; countEl.className = 'buzz-countdown'; }
   showScreen('screen-buzzed');
   socket.volatile.emit('buzz');
 }, { passive: false });
+
+socket.on('you-buzzed', ({ singingTime }) => {
+  const el = document.getElementById('buzz-countdown');
+  if (el) { el.textContent = singingTime || 10; el.className = 'buzz-countdown'; }
+});
+
+socket.on('singing-timer', ({ secondsLeft }) => {
+  const el = document.getElementById('buzz-countdown');
+  if (!el) return;
+  el.textContent = secondsLeft;
+  el.className = 'buzz-countdown' + (secondsLeft <= 3 ? ' danger' : secondsLeft <= 5 ? ' warning' : '');
+});
+
+socket.on('singing-timeout', () => {
+  const el = document.getElementById('buzz-countdown');
+  if (el) { el.textContent = '0'; el.className = 'buzz-countdown danger'; }
+  const subEl = document.getElementById('buzzed-sub-text');
+  if (subEl) subEl.textContent = "Time's up!";
+});
 
 socket.on('someone-buzzed', ({ teamName, teamColor, playerName }) => {
   const buzzer = document.getElementById('buzzer-fullscreen');

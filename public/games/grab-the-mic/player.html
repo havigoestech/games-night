@@ -16,6 +16,9 @@
     .get-ready-text { color: rgba(255,255,255,0.6); font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
     .buzzed-label { font-family: 'Fredoka', sans-serif; font-size: clamp(32px, 10vw, 56px); font-weight: 700; }
     .buzzed-sub { font-size: 1rem; font-weight: 600; opacity: 0.7; margin-top: 8px; }
+    .buzz-countdown { font-family: 'Fredoka', sans-serif; font-size: 4rem; font-weight: 700; color: #34C759; transition: color 0.3s; }
+    .buzz-countdown.warning { color: #FF9500; }
+    .buzz-countdown.danger { color: #FF2D55; }
     #screen-result .result-team-badge { font-family: 'Fredoka', sans-serif; font-size: 1.5rem; font-weight: 700; padding: 14px 28px; border-radius: 16px; margin-bottom: 8px; }
     #screen-result .result-msg { font-size: 1rem; color: rgba(255,255,255,0.7); font-weight: 600; }
     #screen-game-over { justify-content: flex-start; padding-top: 40px; }
@@ -82,7 +85,8 @@
   <div id="screen-buzzed" class="screen col center gap-12">
     <span style="font-size:3.5rem">🎤</span>
     <div class="buzzed-label">YOU BUZZED!</div>
-    <div class="buzzed-sub">Waiting for host judgement...</div>
+    <div class="buzz-countdown" id="buzz-countdown"></div>
+    <div class="buzzed-sub" id="buzzed-sub-text">Sing it now!</div>
   </div>
 
   <!-- SOMEONE ELSE BUZZED -->

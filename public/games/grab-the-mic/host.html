@@ -25,6 +25,13 @@
     #screen-game-over { justify-content: flex-start; padding-top: 32px; }
     .back-link { display: inline-flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.4); font-size: 0.85rem; font-weight: 700; text-decoration: none; margin-bottom: 8px; }
     .back-link:hover { color: rgba(255,255,255,0.7); }
+    .timer-selector { display: flex; gap: 8px; justify-content: center; }
+    .timer-btn { flex: 1; padding: 10px 8px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); font-family: 'Fredoka', sans-serif; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+    .timer-btn:hover { background: rgba(255,255,255,0.15); }
+    .timer-btn.active { background: rgba(88,86,214,0.3); border-color: #5856D6; color: #fff; }
+    .singing-countdown { font-family: 'Fredoka', sans-serif; font-size: 3.5rem; font-weight: 700; color: #34C759; text-align: center; transition: color 0.3s; }
+    .singing-countdown.warning { color: #FF9500; }
+    .singing-countdown.danger { color: #FF2D55; }
   </style>
 </head>
 <body>
@@ -49,6 +56,15 @@
       <div>
         <div class="section-label">Team Names</div>
         <div id="team-name-inputs" class="col gap-8"></div>
+      </div>
+      <div>
+        <div class="section-label">Singing Timer</div>
+        <div class="timer-selector" id="timer-selector">
+          <button class="timer-btn" data-seconds="8">8s</button>
+          <button class="timer-btn active" data-seconds="10">10s</button>
+          <button class="timer-btn" data-seconds="12">12s</button>
+          <button class="timer-btn" data-seconds="15">15s</button>
+        </div>
       </div>
       <button class="btn btn-reveal mt-8" id="btn-create">Create Room</button>
       <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
@@ -105,6 +121,7 @@
     <div style="font-size:1.1rem;color:var(--text-muted);font-weight:600">
       Buzzed by <span id="judging-player" style="color:#fff;font-weight:800"></span>
     </div>
+    <div class="singing-countdown" id="judging-countdown">10</div>
     <p style="font-family:'Fredoka',sans-serif;font-size:1.6rem;font-weight:600">Did they sing it?</p>
     <div class="judge-row">
       <button class="btn btn-green" id="btn-yes">Yes — Point!</button>
