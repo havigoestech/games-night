@@ -244,18 +244,7 @@ module.exports = function registerGrabTheMic(namespace, localIP, port) {
           room.singingTimer = null;
 
           if (room.phase === 'judging') {
-            room.phase = 'results';
-            const scores = getScores(room);
-            const winnerTeam = room.buzzer ? room.teams[room.buzzer.teamIndex] : null;
             namespace.to(roomCode).emit('singing-timeout', {});
-            namespace.to(roomCode).emit('round-complete', {
-              scores, awarded: false,
-              winnerTeamIndex: room.buzzer?.teamIndex ?? null,
-              winnerName: room.buzzer?.playerName ?? null,
-              winnerTeamName: winnerTeam?.name ?? null,
-              winnerTeamColor: winnerTeam?.color ?? null,
-              timedOut: true
-            });
           }
         }
       }, 1000);

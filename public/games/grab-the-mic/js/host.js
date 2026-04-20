@@ -188,6 +188,8 @@ socket.on('player-buzzed', ({ teamName, teamColor, playerName, singingTime }) =>
   document.getElementById('judging-word').textContent = currentWord;
   const countEl = document.getElementById('judging-countdown');
   if (countEl) { countEl.textContent = singingTime || 10; countEl.className = 'singing-countdown'; }
+  const timeUpBanner = document.getElementById('time-up-banner');
+  if (timeUpBanner) timeUpBanner.style.display = 'none';
   showScreen('screen-judging');
 });
 
@@ -201,6 +203,8 @@ socket.on('singing-timer', ({ secondsLeft }) => {
 socket.on('singing-timeout', () => {
   const el = document.getElementById('judging-countdown');
   if (el) { el.textContent = '0'; el.className = 'singing-countdown danger'; }
+  const banner = document.getElementById('time-up-banner');
+  if (banner) banner.style.display = 'block';
 });
 
 document.getElementById('btn-yes').addEventListener('click',  () => socket.emit('judge', { awarded: true }));

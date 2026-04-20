@@ -132,7 +132,7 @@ document.getElementById('buzzer-fullscreen').addEventListener('pointerdown', (e)
   const countEl = document.getElementById('buzz-countdown');
   if (countEl) { countEl.textContent = ''; countEl.className = 'buzz-countdown'; }
   showScreen('screen-buzzed');
-  socket.volatile.emit('buzz');
+  socket.emit('buzz');
 }, { passive: false });
 
 socket.on('you-buzzed', ({ singingTime }) => {
@@ -151,7 +151,7 @@ socket.on('singing-timeout', () => {
   const el = document.getElementById('buzz-countdown');
   if (el) { el.textContent = '0'; el.className = 'buzz-countdown danger'; }
   const subEl = document.getElementById('buzzed-sub-text');
-  if (subEl) subEl.textContent = "Time's up!";
+  if (subEl) subEl.textContent = "Time's up! Waiting for host...";
 });
 
 socket.on('someone-buzzed', ({ teamName, teamColor, playerName }) => {
