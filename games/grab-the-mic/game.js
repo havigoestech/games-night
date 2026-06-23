@@ -114,7 +114,10 @@ module.exports = function registerGrabTheMic(namespace, localIP, port) {
         socket.roomCode = roomCode;
         socket.isHost = true;
 
-        const playerBaseUrl = baseUrl || `http://${localIP}:${port}`;
+        // Host might have opened the page on localhost — players on phones
+        // can't reach that, so swap localhost/127.0.0.1 for the LAN IP.
+        const isLocalhost = baseUrl && /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(baseUrl);
+        const playerBaseUrl = (!baseUrl || isLocalhost) ? `http://${localIP}:${port}` : baseUrl;
         const joinUrl = `${playerBaseUrl}/games/grab-the-mic/player.html?room=${roomCode}`;
 
         console.log('[grab-the-mic] Room created:', roomCode, '| singing timer:', singTime + 's');

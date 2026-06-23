@@ -7,6 +7,7 @@ let teamNames   = [];
 let pendingRoomCode   = '';
 let pendingPlayerName = '';
 let buzzerFired = false;
+let buzzersLiveTimeout = null;
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -126,7 +127,8 @@ socket.on('buzzers-live', () => {
   const numEl = document.getElementById('player-countdown');
   numEl.className = 'countdown-num go';
   numEl.textContent = 'GO!';
-  setTimeout(showBuzzer, 400);
+  if (buzzersLiveTimeout) clearTimeout(buzzersLiveTimeout);
+  buzzersLiveTimeout = setTimeout(() => { buzzersLiveTimeout = null; showBuzzer(); }, 400);
 });
 
 // ── Buzzer (instant on tap) ───────────────────────────────────
@@ -179,9 +181,15 @@ socket.on('singing-timeout', () => {
 });
 
 socket.on('someone-buzzed', ({ teamName, teamColor, playerName }) => {
+  // If a buzz beat us during our own 'GO!' transition, cancel the pending
+  // showBuzzer so we jump straight to the someone-buzzed screen instead of
+  // landing on a buzzer that the server will now reject.
+  if (buzzersLiveTimeout) { clearTimeout(buzzersLiveTimeout); buzzersLiveTimeout = null; }
   const buzzer = document.getElementById('buzzer-fullscreen');
-  // Respond if we're still on the buzzer screen — whether we tapped (pending) or haven't tapped yet
-  if (!buzzer.classList.contains('active')) return;
+  const currentScreen = document.querySelector('.screen.active');
+  const inCountdown = currentScreen && currentScreen.id === 'screen-word-countdown';
+  // Render if we're on the buzzer (tapped or not) or still in the countdown→buzzer transition
+  if (!buzzer.classList.contains('active') && !inCountdown) return;
   buzzer.classList.remove('buzzer-pending');
   document.getElementById('sb-team-name').textContent = teamName;
   document.getElementById('sb-team-name').style.color  = teamColor;

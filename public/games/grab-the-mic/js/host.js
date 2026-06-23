@@ -7,6 +7,7 @@ let allPlayers = [];
 let currentScores = [];
 let currentWord = '';
 let selectedSingingTime = 10;
+let buzzersLiveTimeout = null;
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -176,7 +177,9 @@ socket.on('buzzers-live', () => {
   const numEl = document.getElementById('countdown-num');
   numEl.className = 'countdown-num go';
   numEl.textContent = 'GO!';
-  setTimeout(() => {
+  if (buzzersLiveTimeout) clearTimeout(buzzersLiveTimeout);
+  buzzersLiveTimeout = setTimeout(() => {
+    buzzersLiveTimeout = null;
     document.getElementById('live-word').textContent = currentWord;
     showScreen('screen-buzzers-live');
   }, 600);
@@ -184,6 +187,9 @@ socket.on('buzzers-live', () => {
 
 // ── Judging ───────────────────────────────────────────────────
 socket.on('player-buzzed', ({ teamName, teamColor, playerName, singingTime }) => {
+  // A fast buzz can arrive while the 'GO!' transition is still pending —
+  // cancel it so the judging screen isn't overwritten back to buzzers-live.
+  if (buzzersLiveTimeout) { clearTimeout(buzzersLiveTimeout); buzzersLiveTimeout = null; }
   Sounds.buzz();
   const badge = document.getElementById('judging-badge');
   const isGold = teamColor === '#FFD60A';
