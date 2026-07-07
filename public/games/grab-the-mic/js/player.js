@@ -1,13 +1,42 @@
 const socket = io('/grab-the-mic');
 
+// Persistent identity — survives screen locks, refreshes, and re-scans of the
+// QR code, so the server can re-bind us to our existing player slot.
+const playerId = (() => {
+  try {
+    let id = localStorage.getItem('gtm-pid');
+    if (!id) {
+      id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+         : 'p-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem('gtm-pid', id);
+    }
+    return id;
+  } catch (e) {
+    return 'p-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+})();
+
 let myTeamIndex = -1;
 let myTeamColor = '#5856D6';
 let teamColors  = [];
 let teamNames   = [];
 let pendingRoomCode   = '';
 let pendingPlayerName = '';
+let roomMode = 'teams';
 let buzzerFired = false;
 let buzzersLiveTimeout = null;
+let joinedRoomCode = null;
+
+function savedSession() {
+  try { return JSON.parse(sessionStorage.getItem('gtm-session') || 'null'); } catch (e) { return null; }
+}
+function saveSession(roomCode) {
+  try { sessionStorage.setItem('gtm-session', JSON.stringify({ roomCode })); } catch (e) {}
+}
+function clearSession() {
+  joinedRoomCode = null;
+  try { sessionStorage.removeItem('gtm-session'); } catch (e) {}
+}
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -28,7 +57,41 @@ function showBuzzer() {
   buzzerFired = false;
 }
 
-// Pre-fill room code from URL (QR code scan)
+function setWaitingLabel(text) {
+  const el = document.getElementById('waiting-label');
+  if (el) el.textContent = text;
+}
+
+// ── Keep the phone awake during the game ─────────────────────
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+  } catch (e) { /* not supported or denied — reconnect flow covers us */ }
+}
+
+// ── Reconnect / resync ────────────────────────────────────────
+socket.on('connect', () => {
+  const sess = savedSession();
+  const roomCode = joinedRoomCode || (sess && sess.roomCode);
+  if (roomCode) socket.emit('rejoin-room', { roomCode, playerId });
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  requestWakeLock();
+  if (joinedRoomCode && socket.connected) socket.emit('request-sync');
+  // If the socket dropped while the screen was off, socket.io auto-reconnects
+  // and the 'connect' handler above rejoins.
+});
+
+socket.on('rejoin-failed', ({ message }) => {
+  clearSession();
+  document.getElementById('join-error').textContent = message || 'Please join again.';
+  showScreen('screen-join');
+});
+
+// ── Pre-fill room code from URL (QR code scan) ────────────────
 const roomFromUrl = new URLSearchParams(location.search).get('room');
 if (roomFromUrl) document.getElementById('input-room').value = roomFromUrl.toUpperCase();
 
@@ -44,6 +107,7 @@ document.getElementById('btn-join').addEventListener('click', doJoin);
 
 function doJoin() {
   Sounds.unlockAudio();
+  requestWakeLock();
   const name = document.getElementById('input-name').value.trim();
   const room = document.getElementById('input-room').value.trim().toUpperCase();
   const err  = document.getElementById('join-error');
@@ -55,8 +119,16 @@ function doJoin() {
   socket.emit('check-room', { roomCode: room });
 }
 
-socket.on('room-check-result', ({ found, message, teams }) => {
+socket.on('room-check-result', ({ found, message, teams, mode }) => {
   if (!found) { document.getElementById('join-error').textContent = message; return; }
+  roomMode = mode || 'teams';
+
+  // Individual mode: no team to pick — you are your own team.
+  if (roomMode === 'individual') {
+    selectTeam(-1);
+    return;
+  }
+
   teamColors = teams.map(t => t.color);
   teamNames  = teams.map(t => t.name);
   const container = document.getElementById('team-buttons');
@@ -73,7 +145,7 @@ socket.on('room-check-result', ({ found, message, teams }) => {
 });
 
 function selectTeam(idx) {
-  socket.emit('join-room', { roomCode: pendingRoomCode, playerName: pendingPlayerName, teamIndex: idx });
+  socket.emit('join-room', { roomCode: pendingRoomCode, playerName: pendingPlayerName, teamIndex: idx, playerId });
 }
 
 socket.on('join-error', ({ message }) => {
@@ -81,16 +153,20 @@ socket.on('join-error', ({ message }) => {
   showScreen('screen-join');
 });
 
-// ── Joined ────────────────────────────────────────────────────
-socket.on('joined', ({ teamIndex, teamNames: names, teamColors: colors, scores, phase }) => {
-  myTeamIndex = teamIndex;
-  teamColors  = colors;
-  teamNames   = names;
-  myTeamColor = colors[teamIndex];
+// ── Joined (fresh join AND reconnect — payload is a full snapshot) ──
+socket.on('joined', (snap) => {
+  myTeamIndex = snap.teamIndex;
+  teamNames   = snap.teamNames;
+  teamColors  = snap.teamColors;
+  myTeamColor = teamColors[myTeamIndex] || '#5856D6';
+  roomMode    = snap.mode || 'teams';
+  joinedRoomCode = snap.roomCode;
+  saveSession(snap.roomCode);
+  requestWakeLock();
 
   const badge = document.getElementById('waiting-team-badge');
   const isGold = myTeamColor === '#FFD60A';
-  badge.textContent = names[teamIndex];
+  badge.textContent = teamNames[myTeamIndex] || '';
   badge.style.cssText = `background:${myTeamColor};color:${isGold ? '#111' : '#fff'}`;
 
   document.getElementById('screen-waiting').style.background =
@@ -98,19 +174,52 @@ socket.on('joined', ({ teamIndex, teamNames: names, teamColors: colors, scores, 
   document.getElementById('screen-buzzed').style.background =
     `radial-gradient(ellipse at center, ${myTeamColor}44 0%, var(--bg) 70%)`;
 
-  renderScoreCards('waiting-scores', scores);
-
-  if (phase === 'buzzers-live') showBuzzer();
-  else showScreen('screen-waiting');
+  applySnapshot(snap);
 });
 
+socket.on('sync', applySnapshot);
+
+// Land on the right screen for wherever the game currently is.
+function applySnapshot(s) {
+  if (!s) return;
+  if (s.teamNames)  teamNames  = s.teamNames;
+  if (s.teamColors) { teamColors = s.teamColors; myTeamColor = teamColors[myTeamIndex] || myTeamColor; }
+  if (s.scores) renderScoreCards('waiting-scores', s.scores);
+
+  if (s.phase === 'countdown') {
+    document.getElementById('player-word').textContent = s.currentWord || '';
+    const numEl = document.getElementById('player-countdown');
+    numEl.className = 'countdown-num';
+    numEl.textContent = s.countdownSecondsLeft ?? s.buzzCountdown ?? 3;
+    showScreen('screen-word-countdown');
+  } else if (s.phase === 'buzzers-live') {
+    showBuzzer();
+  } else if (s.phase === 'judging' && s.buzzer) {
+    if (s.buzzer.playerId === playerId) {
+      const el = document.getElementById('buzz-countdown');
+      if (el && s.singingSecondsLeft != null) el.textContent = s.singingSecondsLeft;
+      const subEl = document.getElementById('buzzed-sub-text');
+      if (subEl) subEl.textContent = 'Sing it now!';
+      showScreen('screen-buzzed');
+    } else {
+      document.getElementById('sb-team-name').textContent = s.buzzer.teamName || '';
+      document.getElementById('sb-team-name').style.color = s.buzzer.teamColor || '#fff';
+      document.getElementById('sb-player-name').textContent = s.buzzer.playerName || '';
+      showScreen('screen-someone-buzzed');
+    }
+  } else {
+    setWaitingLabel('Waiting for next word...');
+    showScreen('screen-waiting');
+  }
+}
+
 // ── Game flow ─────────────────────────────────────────────────
-socket.on('word-reveal', ({ word }) => {
+socket.on('word-reveal', ({ word, countdownFrom }) => {
   Sounds.wordReveal();
   document.getElementById('player-word').textContent = word;
   const numEl = document.getElementById('player-countdown');
   numEl.className = 'countdown-num';
-  numEl.textContent = '3';
+  numEl.textContent = countdownFrom || 3;
   showScreen('screen-word-countdown');
 });
 
@@ -198,7 +307,7 @@ socket.on('someone-buzzed', ({ teamName, teamColor, playerName }) => {
 });
 
 // ── Results ───────────────────────────────────────────────────
-socket.on('round-complete', ({ scores, awarded, winnerTeamName, winnerTeamColor, winnerName }) => {
+socket.on('round-complete', ({ scores, verdict, awarded, winnerTeamName, winnerTeamColor, winnerName, goalReached }) => {
   if (awarded) Sounds.pointAwarded(); else Sounds.noPoint();
   renderScoreCards('result-scores', scores);
 
@@ -208,9 +317,14 @@ socket.on('round-complete', ({ scores, awarded, winnerTeamName, winnerTeamColor,
     const isGold = winnerTeamColor === '#FFD60A';
     badge.textContent = winnerTeamName;
     badge.style.cssText = `background:${winnerTeamColor};color:${isGold ? '#111' : '#fff'}`;
-    msg.textContent = awarded
-      ? `${winnerName} sang it — point awarded!`
-      : `${winnerName} didn't make it — no point.`;
+    if (verdict === 'award') {
+      msg.textContent = `${winnerName} sang it — point awarded!`;
+    } else if (verdict === 'deduct') {
+      msg.textContent = `${winnerName} buzzed but didn't sing — point deducted!`;
+    } else {
+      msg.textContent = `${winnerName} didn't make it — no point.`;
+    }
+    if (goalReached) msg.textContent += ` 🏆 ${goalReached.teamName} reached ${goalReached.goal} points!`;
   } else {
     badge.textContent = 'No buzz';
     badge.style.cssText = 'background:rgba(255,255,255,0.1);color:#fff';
@@ -222,18 +336,27 @@ socket.on('round-complete', ({ scores, awarded, winnerTeamName, winnerTeamColor,
   setTimeout(() => {
     if (document.getElementById('screen-result').classList.contains('active')) {
       renderScoreCards('waiting-scores', scores);
+      setWaitingLabel('Waiting for next word...');
       showScreen('screen-waiting');
     }
   }, 4000);
 });
 
+// ── Pause ─────────────────────────────────────────────────────
+socket.on('game-paused', () => {
+  setWaitingLabel('Game paused — new players can join now!');
+  showScreen('screen-waiting');
+});
+
 socket.on('game-over', ({ scores }) => {
   Sounds.gameOver();
+  clearSession();
   renderLeaderboard('player-final-leaderboard', scores);
   showScreen('screen-game-over');
 });
 
 socket.on('host-disconnected', () => {
+  clearSession();
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('buzzer-fullscreen').classList.remove('active');
   document.getElementById('screen-host-disconnected').classList.add('active');
@@ -249,7 +372,7 @@ function renderScoreCards(containerId, scores) {
     const card = document.createElement('div');
     card.className = 'score-card';
     card.style.cssText = `background:${s.color};color:${isGold ? '#111' : '#fff'}`;
-    card.innerHTML = `<div class="team-name">${s.name}</div><div class="score-num">${s.score}</div>`;
+    card.innerHTML = `<div class="team-name">${escapeHtml(s.name)}</div><div class="score-num">${s.score}</div>`;
     container.appendChild(card);
   });
 }
@@ -265,9 +388,13 @@ function renderLeaderboard(containerId, scores) {
     if (isWinner) row.style.cssText = `background:${s.color}22;border-color:${s.color}`;
     row.innerHTML = `
       <div class="lb-rank">${isWinner ? '👑' : i + 1}</div>
-      <div class="lb-name" style="color:${s.color}">${s.name}</div>
+      <div class="lb-name" style="color:${s.color}">${escapeHtml(s.name)}</div>
       <div class="lb-score">${s.score}</div>
     `;
     container.appendChild(row);
   });
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

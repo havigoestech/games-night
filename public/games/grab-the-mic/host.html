@@ -32,6 +32,9 @@
     .singing-countdown { font-family: 'Fredoka', sans-serif; font-size: 3.5rem; font-weight: 700; color: #34C759; text-align: center; transition: color 0.3s; }
     .singing-countdown.warning { color: #FF9500; }
     .singing-countdown.danger { color: #FF2D55; }
+    .btn-deduct { background: rgba(255,45,85,0.12); border: 2px solid #FF2D55; color: #FF2D55; font-size: 1rem; padding: 12px 24px; width: 100%; max-width: 480px; }
+    .result-banner.goal { background: rgba(255,214,10,0.18); color: #FFD60A; font-size: 1.4rem; }
+    .away { opacity: 0.45; }
   </style>
 </head>
 <body>
@@ -46,16 +49,34 @@
     </div>
     <div class="card col gap-16">
       <div>
-        <div class="section-label">Number of Teams</div>
-        <div class="team-count-row">
-          <button class="count-btn" id="count-down">−</button>
-          <div class="count-num" id="team-count-display">4</div>
-          <button class="count-btn" id="count-up">+</button>
+        <div class="section-label">Game Mode</div>
+        <div class="timer-selector" id="mode-selector">
+          <button class="timer-btn active" data-mode="teams">Teams</button>
+          <button class="timer-btn" data-mode="individual">Individuals</button>
+        </div>
+      </div>
+      <div id="teams-setup" class="col gap-16">
+        <div>
+          <div class="section-label">Number of Teams</div>
+          <div class="team-count-row">
+            <button class="count-btn" id="count-down">−</button>
+            <div class="count-num" id="team-count-display">4</div>
+            <button class="count-btn" id="count-up">+</button>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">Team Names</div>
+          <div id="team-name-inputs" class="col gap-8"></div>
         </div>
       </div>
       <div>
-        <div class="section-label">Team Names</div>
-        <div id="team-name-inputs" class="col gap-8"></div>
+        <div class="section-label">Buzz-In Countdown</div>
+        <div class="timer-selector" id="buzz-selector">
+          <button class="timer-btn active" data-seconds="3">3s</button>
+          <button class="timer-btn" data-seconds="5">5s</button>
+          <button class="timer-btn" data-seconds="8">8s</button>
+          <button class="timer-btn" data-seconds="10">10s</button>
+        </div>
       </div>
       <div>
         <div class="section-label">Singing Timer</div>
@@ -64,6 +85,16 @@
           <button class="timer-btn active" data-seconds="10">10s</button>
           <button class="timer-btn" data-seconds="12">12s</button>
           <button class="timer-btn" data-seconds="15">15s</button>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Play To (Score Goal)</div>
+        <div class="timer-selector" id="goal-selector">
+          <button class="timer-btn active" data-goal="0">None</button>
+          <button class="timer-btn" data-goal="10">10</button>
+          <button class="timer-btn" data-goal="15">15</button>
+          <button class="timer-btn" data-goal="20">20</button>
+          <button class="timer-btn" data-goal="25">25</button>
         </div>
       </div>
       <button class="btn btn-reveal mt-8" id="btn-create">Create Room</button>
@@ -79,6 +110,7 @@
         <div class="room-code" id="lobby-room-code">----</div>
         <div class="lobby-join-url" id="lobby-join-url"></div>
         <div id="lobby-player-address" style="font-size:0.85rem;color:#34C759;font-weight:700;margin-top:6px;background:rgba(52,199,89,0.12);border-radius:8px;padding:6px 12px"></div>
+        <div id="lobby-goal" style="display:none;font-size:0.85rem;color:#FFD60A;font-weight:700;margin-top:6px;background:rgba(255,214,10,0.12);border-radius:8px;padding:6px 12px"></div>
       </div>
       <div class="qr-wrap" id="lobby-qr" style="display:none">
         <img id="lobby-qr-img" width="160" height="160" alt="QR Code">
@@ -128,18 +160,25 @@
       <button class="btn btn-green" id="btn-yes">Yes — Point!</button>
       <button class="btn btn-red"   id="btn-nope">Nope</button>
     </div>
+    <button class="btn btn-deduct" id="btn-deduct">Buzzed &amp; bailed — deduct a point</button>
   </div>
 
   <!-- RESULTS -->
   <div id="screen-results" class="screen col center gap-16">
+    <div id="goal-banner" class="result-banner goal" style="display:none"></div>
     <div id="results-banner" class="result-banner"></div>
     <div>
       <div class="section-label mb-8">Scores</div>
       <div class="score-grid" id="results-scores"></div>
     </div>
-    <div class="lobby-actions">
+    <div class="lobby-actions" id="results-actions">
       <button class="btn btn-reveal" id="btn-next-word">Next Word</button>
+      <button class="btn btn-ghost"  id="btn-pause">Pause — Add Players</button>
       <button class="btn btn-ghost"  id="btn-end-game">End Game</button>
+    </div>
+    <div class="lobby-actions" id="goal-actions" style="display:none">
+      <button class="btn btn-green" id="btn-goal-end">🏆 End Game — Crown the Winner</button>
+      <button class="btn btn-ghost" id="btn-goal-continue">Keep Playing (goal +5)</button>
     </div>
   </div>
 

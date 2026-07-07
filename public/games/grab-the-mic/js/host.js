@@ -7,6 +7,11 @@ let allPlayers = [];
 let currentScores = [];
 let currentWord = '';
 let selectedSingingTime = 10;
+let selectedBuzzCountdown = 3;
+let selectedGoal = 0;
+let selectedMode = 'teams';
+let gameMode = 'teams';
+let scoreGoal = null;
 let buzzersLiveTimeout = null;
 
 function showScreen(id) {
@@ -44,6 +49,24 @@ document.getElementById('count-up').addEventListener('click', () => {
   if (teamCount < 8) { teamCount++; countDisplay.textContent = teamCount; renderTeamInputs(); }
 });
 
+function bindSelector(containerId, onSelect) {
+  document.querySelectorAll(`#${containerId} .timer-btn`).forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll(`#${containerId} .timer-btn`).forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      onSelect(btn);
+    });
+  });
+}
+
+bindSelector('timer-selector', b => { selectedSingingTime = parseInt(b.dataset.seconds); });
+bindSelector('buzz-selector',  b => { selectedBuzzCountdown = parseInt(b.dataset.seconds); });
+bindSelector('goal-selector',  b => { selectedGoal = parseInt(b.dataset.goal) || 0; });
+bindSelector('mode-selector',  b => {
+  selectedMode = b.dataset.mode;
+  document.getElementById('teams-setup').style.display = selectedMode === 'individual' ? 'none' : 'flex';
+});
+
 document.getElementById('btn-create').addEventListener('click', () => {
   Sounds.unlockAudio();
   const btn = document.getElementById('btn-create');
@@ -55,29 +78,42 @@ document.getElementById('btn-create').addEventListener('click', () => {
     const el = document.getElementById(`team-name-${i}`);
     return el ? el.value.trim() : '';
   });
-  socket.emit('create-room', { teamCount, teamNames, baseUrl: `${location.protocol}//${location.host}`, singingTime: selectedSingingTime });
+  socket.emit('create-room', {
+    teamCount,
+    teamNames,
+    baseUrl: `${location.protocol}//${location.host}`,
+    singingTime: selectedSingingTime,
+    buzzCountdown: selectedBuzzCountdown,
+    scoreGoal: selectedGoal || null,
+    mode: selectedMode
+  });
 
   setTimeout(() => { btn.textContent = 'Create Room'; btn.disabled = false; dbg(''); }, 8000);
 });
 
 renderTeamInputs();
 
-document.querySelectorAll('.timer-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.timer-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    selectedSingingTime = parseInt(btn.dataset.seconds);
-  });
-});
-
 // ── Lobby ──────────────────────────────────────────────────────
+function updateGoalChip() {
+  const el = document.getElementById('lobby-goal');
+  if (!el) return;
+  if (scoreGoal) {
+    el.textContent = `🎯 First to ${scoreGoal} points wins`;
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 socket.on('room-created', (data) => {
   try {
-    const { roomCode, joinUrl, localIP, port, teams } = data;
+    const { roomCode, joinUrl, localIP, port, teams, mode, scoreGoal: goal } = data;
     document.getElementById('btn-create').textContent = 'Create Room';
     document.getElementById('btn-create').disabled = false;
     dbg('');
 
+    gameMode = mode || 'teams';
+    scoreGoal = goal || null;
     currentScores = teams.map((t, i) => ({ index: i, name: t.name, color: t.color, score: 0 }));
     allPlayers = [];
 
@@ -87,7 +123,8 @@ socket.on('room-created', (data) => {
     const ipEl = document.getElementById('lobby-player-address');
     if (ipEl) ipEl.innerHTML = `Players go to: <strong>http://${localIP}:${port}</strong>`;
 
-    renderPlayerGroups(teams);
+    updateGoalChip();
+    renderPlayerGroups();
     showScreen('screen-lobby');
   } catch (err) {
     dbg('Error: ' + err.message);
@@ -107,31 +144,50 @@ socket.on('create-room-error', ({ message }) => {
   dbg('Error: ' + message);
 });
 
-socket.on('player-joined', ({ playerName, teamIndex, allPlayers: players }) => {
+// Single source of truth for the roster — fired on join, rejoin, and
+// disconnect. Disconnected players stay listed (marked away) instead of
+// vanishing, and rejoiners never duplicate.
+socket.on('players-update', ({ allPlayers: players, scores }) => {
   allPlayers = players;
+  if (scores) currentScores = scores;
   document.getElementById('player-count').textContent = players.length;
-  renderPlayerGroups(currentScores.map(s => ({ name: s.name, color: s.color })));
+  renderPlayerGroups();
+  if (document.getElementById('lobby-scores-section').style.display !== 'none') {
+    renderScoreCards('lobby-scores', currentScores);
+  }
 });
 
-socket.on('player-left', ({ allPlayers: players }) => {
-  allPlayers = players;
-  document.getElementById('player-count').textContent = players.length;
-  renderPlayerGroups(currentScores.map(s => ({ name: s.name, color: s.color })));
-});
-
-function renderPlayerGroups(teams) {
+function renderPlayerGroups() {
   const container = document.getElementById('player-groups');
   container.innerHTML = '';
-  teams.forEach((team, i) => {
-    const members = allPlayers.filter(p => p.teamIndex === i).map(p => p.name);
+
+  const memberLabel = p => `<span${p.connected === false ? ' class="away"' : ''}>${escapeHtml(p.name)}${p.connected === false ? ' (away)' : ''}</span>`;
+
+  if (gameMode === 'individual') {
     const div = document.createElement('div');
     div.className = 'player-group';
     div.innerHTML = `
-      <div class="player-group-header" style="color:${team.color}">${team.name}</div>
-      <div class="player-group-members">${members.length ? members.join(', ') : 'No players yet'}</div>
+      <div class="player-group-header" style="color:#BF5AF2">Players</div>
+      <div class="player-group-members">${allPlayers.length ? allPlayers.map(memberLabel).join(', ') : 'No players yet — scan the QR to join'}</div>
+    `;
+    container.appendChild(div);
+    return;
+  }
+
+  currentScores.forEach((team, i) => {
+    const members = allPlayers.filter(p => p.teamIndex === i);
+    const div = document.createElement('div');
+    div.className = 'player-group';
+    div.innerHTML = `
+      <div class="player-group-header" style="color:${team.color}">${escapeHtml(team.name)}</div>
+      <div class="player-group-members">${members.length ? members.map(memberLabel).join(', ') : 'No players yet'}</div>
     `;
     container.appendChild(div);
   });
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 function renderScoreCards(containerId, scores) {
@@ -143,7 +199,7 @@ function renderScoreCards(containerId, scores) {
     const card = document.createElement('div');
     card.className = 'score-card';
     card.style.cssText = `background:${s.color};color:${isGold ? '#111' : '#fff'}`;
-    card.innerHTML = `<div class="team-name">${s.name}</div><div class="score-num">${s.score}</div>`;
+    card.innerHTML = `<div class="team-name">${escapeHtml(s.name)}</div><div class="score-num">${s.score}</div>`;
     container.appendChild(card);
   });
 }
@@ -154,13 +210,13 @@ document.getElementById('btn-end-game-lobby').addEventListener('click', () => {
 });
 
 // ── Countdown ─────────────────────────────────────────────────
-socket.on('word-reveal', ({ word }) => {
+socket.on('word-reveal', ({ word, countdownFrom }) => {
   Sounds.wordReveal();
   currentWord = word;
   document.getElementById('countdown-word').textContent = word;
   const numEl = document.getElementById('countdown-num');
   numEl.className = 'countdown-num';
-  numEl.textContent = '3';
+  numEl.textContent = countdownFrom || 3;
   showScreen('screen-countdown');
 });
 
@@ -220,18 +276,42 @@ socket.on('singing-timeout', () => {
   if (banner) banner.style.display = 'block';
 });
 
-document.getElementById('btn-yes').addEventListener('click',  () => { Sounds.pointAwarded(); socket.emit('judge', { awarded: true }); });
-document.getElementById('btn-nope').addEventListener('click', () => { Sounds.noPoint();      socket.emit('judge', { awarded: false }); });
+document.getElementById('btn-yes').addEventListener('click',    () => { Sounds.pointAwarded(); socket.emit('judge', { verdict: 'award' }); });
+document.getElementById('btn-nope').addEventListener('click',   () => { Sounds.noPoint();      socket.emit('judge', { verdict: 'none' }); });
+document.getElementById('btn-deduct').addEventListener('click', () => { Sounds.noPoint();      socket.emit('judge', { verdict: 'deduct' }); });
 
 // ── Results ───────────────────────────────────────────────────
-socket.on('round-complete', ({ scores, awarded, winnerTeamName }) => {
+socket.on('round-complete', ({ scores, verdict, winnerTeamName, goalReached }) => {
   currentScores = scores;
 
   const banner = document.getElementById('results-banner');
-  banner.textContent = winnerTeamName
-    ? (awarded ? `Point to ${winnerTeamName}!` : `No point — ${winnerTeamName} didn't make it.`)
-    : 'Round complete';
-  banner.className = `result-banner ${awarded ? 'awarded' : 'not-awarded'}`;
+  if (winnerTeamName) {
+    if (verdict === 'award') {
+      banner.textContent = `Point to ${winnerTeamName}!`;
+      banner.className = 'result-banner awarded';
+    } else if (verdict === 'deduct') {
+      banner.textContent = `−1 point from ${winnerTeamName}!`;
+      banner.className = 'result-banner not-awarded';
+    } else {
+      banner.textContent = `No point — ${winnerTeamName} didn't make it.`;
+      banner.className = 'result-banner not-awarded';
+    }
+  } else {
+    banner.textContent = 'Round complete';
+    banner.className = 'result-banner';
+  }
+
+  const goalBanner = document.getElementById('goal-banner');
+  if (goalReached) {
+    goalBanner.textContent = `🏆 ${goalReached.teamName} reached ${goalReached.goal} points!`;
+    goalBanner.style.display = 'block';
+    document.getElementById('results-actions').style.display = 'none';
+    document.getElementById('goal-actions').style.display = 'flex';
+  } else {
+    goalBanner.style.display = 'none';
+    document.getElementById('results-actions').style.display = 'flex';
+    document.getElementById('goal-actions').style.display = 'none';
+  }
 
   renderScoreCards('results-scores', scores);
 
@@ -248,6 +328,25 @@ document.getElementById('btn-next-word').addEventListener('click', () => {
 });
 document.getElementById('btn-end-game').addEventListener('click', () => {
   if (confirm('End the game now?')) socket.emit('end-game');
+});
+
+// ── Pause (back to lobby so new players can scan the QR) ─────
+document.getElementById('btn-pause').addEventListener('click', () => socket.emit('pause-game'));
+socket.on('game-paused', () => showScreen('screen-lobby'));
+
+// ── Score goal reached ────────────────────────────────────────
+document.getElementById('btn-goal-end').addEventListener('click', () => socket.emit('end-game'));
+document.getElementById('btn-goal-continue').addEventListener('click', () => socket.emit('extend-goal'));
+
+socket.on('goal-extended', ({ scoreGoal: goal }) => {
+  scoreGoal = goal;
+  updateGoalChip();
+  document.getElementById('goal-banner').style.display = 'none';
+  document.getElementById('results-actions').style.display = 'flex';
+  document.getElementById('goal-actions').style.display = 'none';
+  const banner = document.getElementById('results-banner');
+  banner.textContent = `Game on — first to ${goal} now!`;
+  banner.className = 'result-banner goal';
 });
 
 // ── Game over ─────────────────────────────────────────────────
@@ -267,7 +366,7 @@ function renderLeaderboard(containerId, scores) {
     if (isWinner) row.style.cssText = `background:${s.color}22;border-color:${s.color}`;
     row.innerHTML = `
       <div class="lb-rank">${isWinner ? '👑' : i + 1}</div>
-      <div class="lb-name" style="color:${s.color}">${s.name}</div>
+      <div class="lb-name" style="color:${s.color}">${escapeHtml(s.name)}</div>
       <div class="lb-score">${s.score}</div>
     `;
     container.appendChild(row);
