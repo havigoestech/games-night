@@ -1,17 +1,43 @@
 const socket = io('/family-feud');
 
-const TEAM_COLORS = ['#FF2D55','#5856D6','#FF9500','#34C759','#00C7BE','#FF375F','#BF5AF2','#FFD60A'];
+// Shared games-night device id (same localStorage key as grab-the-mic) —
+// survives screen locks, refreshes, and QR re-scans so the server can
+// re-bind us to our existing player slot.
+const playerId = (() => {
+  try {
+    let id = localStorage.getItem('gtm-pid');
+    if (!id) {
+      id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+         : 'p-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem('gtm-pid', id);
+    }
+    return id;
+  } catch (e) {
+    return 'p-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+})();
 
 let myTeamIndex = -1;
-let myTeamColor = '#5856D6';
+let myTeamColor = '#FF2D55';
 let teamColors  = [];
 let teamNames   = [];
 let pendingRoomCode   = '';
 let pendingPlayerName = '';
 let buzzerFired = false;
-let currentActiveTeam = -1;
-let currentStealTeam  = -1;
-let currentAnswerCount = 0;
+let joinedRoomCode = null;
+let answerCount = 0;
+let currentPot = 0;
+
+function savedSession() {
+  try { return JSON.parse(sessionStorage.getItem('ff-session') || 'null'); } catch (e) { return null; }
+}
+function saveSession(roomCode) {
+  try { sessionStorage.setItem('ff-session', JSON.stringify({ roomCode })); } catch (e) {}
+}
+function clearSession() {
+  joinedRoomCode = null;
+  try { sessionStorage.removeItem('ff-session'); } catch (e) {}
+}
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -32,7 +58,36 @@ function showBuzzer() {
   buzzerFired = false;
 }
 
-// Pre-fill room code from URL
+// ── Keep the phone awake during the game ─────────────────────
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+  } catch (e) { /* not supported or denied — the reconnect flow covers us */ }
+}
+
+// ── Reconnect / resync ────────────────────────────────────────
+socket.on('connect', () => {
+  const sess = savedSession();
+  const roomCode = joinedRoomCode || (sess && sess.roomCode);
+  if (roomCode) socket.emit('rejoin-room', { roomCode, playerId });
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  requestWakeLock();
+  if (joinedRoomCode && socket.connected) socket.emit('request-sync');
+  // If the socket dropped while the screen was off, socket.io auto-reconnects
+  // and the 'connect' handler above rejoins.
+});
+
+socket.on('rejoin-failed', ({ message }) => {
+  clearSession();
+  document.getElementById('join-error').textContent = message || 'Please join again.';
+  showScreen('screen-join');
+});
+
+// ── Pre-fill room code from URL (QR scan) ─────────────────────
 const roomFromUrl = new URLSearchParams(location.search).get('room');
 if (roomFromUrl) document.getElementById('input-room').value = roomFromUrl.toUpperCase();
 
@@ -48,6 +103,7 @@ document.getElementById('btn-join').addEventListener('click', doJoin);
 
 function doJoin() {
   Sounds.unlockAudio();
+  requestWakeLock();
   const name = document.getElementById('input-name').value.trim();
   const room = document.getElementById('input-room').value.trim().toUpperCase();
   const err  = document.getElementById('join-error');
@@ -70,31 +126,34 @@ socket.on('room-check-result', ({ found, message, teams }) => {
     btn.className = `team-btn${team.color === '#FFD60A' ? ' dark-text' : ''}`;
     btn.style.background = team.color;
     btn.textContent = team.name;
-    btn.addEventListener('click', () => selectTeam(i));
+    btn.addEventListener('click', () => {
+      socket.emit('join-room', {
+        roomCode: pendingRoomCode, playerName: pendingPlayerName, teamIndex: i, playerId
+      });
+    });
     container.appendChild(btn);
   });
   showScreen('screen-team-select');
 });
-
-function selectTeam(idx) {
-  socket.emit('join-room', { roomCode: pendingRoomCode, playerName: pendingPlayerName, teamIndex: idx });
-}
 
 socket.on('join-error', ({ message }) => {
   document.getElementById('join-error').textContent = message;
   showScreen('screen-join');
 });
 
-// ── Joined ────────────────────────────────────────────────────
-socket.on('joined', ({ teamIndex, teamNames: names, teamColors: colors, scores, phase }) => {
-  myTeamIndex = teamIndex;
-  teamColors  = colors;
-  teamNames   = names;
-  myTeamColor = colors[teamIndex];
+// ── Joined (fresh join AND reconnect — payload is a full snapshot) ──
+socket.on('joined', (snap) => {
+  myTeamIndex = snap.teamIndex;
+  teamNames   = snap.teamNames;
+  teamColors  = snap.teamColors;
+  myTeamColor = teamColors[myTeamIndex] || '#FF2D55';
+  joinedRoomCode = snap.roomCode;
+  saveSession(snap.roomCode);
+  requestWakeLock();
 
   const badge = document.getElementById('waiting-team-badge');
   const isGold = myTeamColor === '#FFD60A';
-  badge.textContent = names[teamIndex];
+  badge.textContent = teamNames[myTeamIndex] || '';
   badge.style.cssText = `background:${myTeamColor};color:${isGold ? '#111' : '#fff'}`;
 
   document.getElementById('screen-waiting').style.background =
@@ -102,42 +161,12 @@ socket.on('joined', ({ teamIndex, teamNames: names, teamColors: colors, scores, 
   document.getElementById('screen-buzzed').style.background =
     `radial-gradient(ellipse at center, ${myTeamColor}44 0%, var(--bg) 70%)`;
 
-  renderScoreCards('waiting-scores', scores);
-  showScreen('screen-waiting');
+  applySnapshot(snap);
 });
 
-// ── Question start ────────────────────────────────────────────
-socket.on('question-start', ({ question, answerCount, activeTeamIndex, activeTeamName, activeTeamColor, scores }) => {
-  Sounds.wordReveal();
+socket.on('sync', applySnapshot);
 
-  currentActiveTeam  = activeTeamIndex;
-  currentStealTeam   = -1;
-  currentAnswerCount = answerCount;
-  buzzerFired = false;
-
-  document.getElementById('player-question').textContent = question;
-
-  const isMyTeamActive = activeTeamIndex === myTeamIndex;
-  const activeColor = teamColors[activeTeamIndex] || '#fff';
-  document.getElementById('player-active-team').innerHTML =
-    `<span style="color:${activeColor};font-weight:800">${activeTeamName}</span> is playing`;
-
-  buildMiniBoard(answerCount);
-  document.getElementById('player-strikes').textContent = '';
-  document.getElementById('player-steal-indicator').classList.remove('visible');
-
-  renderScoreCards('player-scores', scores);
-
-  // Hide buzz btn by default; buzzers-live event will show it
-  document.getElementById('player-buzz-btn').classList.remove('visible');
-
-  showScreen('screen-game');
-
-  if (isMyTeamActive) {
-    showBuzzer();
-  }
-});
-
+// ── Board ─────────────────────────────────────────────────────
 function buildMiniBoard(count) {
   const board = document.getElementById('player-board');
   board.innerHTML = '';
@@ -147,7 +176,7 @@ function buildMiniBoard(count) {
     tile.id = `p-tile-${i}`;
     tile.innerHTML = `
       <div class="player-ff-tile-inner">
-        <div class="player-ff-tile-front">?</div>
+        <div class="player-ff-tile-front">${i + 1}</div>
         <div class="player-ff-tile-back">
           <span class="p-answer-text" id="p-tile-text-${i}"></span>
           <span class="p-answer-pts"  id="p-tile-pts-${i}"></span>
@@ -158,30 +187,166 @@ function buildMiniBoard(count) {
   }
 }
 
-// ── Buzzers live ──────────────────────────────────────────────
-socket.on('buzzers-live', ({ activeTeamIndex }) => {
-  Sounds.go();
-  currentActiveTeam = activeTeamIndex;
-  currentStealTeam  = -1;
-  buzzerFired = false;
+function flipTile(index, text, pts) {
+  const tile = document.getElementById(`p-tile-${index}`);
+  if (!tile) return;
+  const textEl = document.getElementById(`p-tile-text-${index}`);
+  const ptsEl  = document.getElementById(`p-tile-pts-${index}`);
+  if (textEl) textEl.textContent = text;
+  if (ptsEl)  ptsEl.textContent  = pts;
+  tile.classList.add('revealed');
+}
 
-  const activeColor = teamColors[activeTeamIndex] || '#fff';
-  const activeTeamName = teamNames[activeTeamIndex] || `Team ${activeTeamIndex + 1}`;
-  document.getElementById('player-active-team').innerHTML =
-    `<span style="color:${activeColor};font-weight:800">${activeTeamName}</span> is playing`;
+function renderStrikes(n) {
+  document.getElementById('player-strikes').textContent = '❌'.repeat(n || 0);
+}
 
-  if (activeTeamIndex === myTeamIndex) {
-    showBuzzer();
+function setPot(pot) {
+  currentPot = pot || 0;
+  document.getElementById('player-pot').textContent = currentPot > 0 ? `Round pot: ${currentPot} pts` : '';
+}
+
+function setStatus(html, color) {
+  const el = document.getElementById('player-status');
+  el.innerHTML = html;
+  if (color) {
+    el.style.borderColor = color;
+    el.style.background  = `${color}22`;
   } else {
-    // Make sure we're on the game screen
-    if (!document.getElementById('screen-game').classList.contains('active')) {
-      showScreen('screen-game');
+    el.style.borderColor = 'rgba(255,255,255,0.12)';
+    el.style.background  = 'rgba(255,255,255,0.06)';
+  }
+}
+
+const sub = t => `<br><span style="font-weight:600;font-size:0.85rem;color:rgba(255,255,255,0.7)">${t}</span>`;
+
+// Phase → status banner. Driven by both live events and snapshots, so a
+// woken phone shows exactly what an in-the-room phone shows.
+function renderPhaseStatus(s) {
+  const mine = i => i === myTeamIndex;
+  switch (s.phase) {
+    case 'faceoff-counter': {
+      const ct = s.faceoff.counterTeamIndex;
+      if (mine(ct)) {
+        setStatus(`YOUR TEAM'S COUNTER${sub('Decide together — ONE player answers out loud!')}`, teamColors[ct]);
+      } else {
+        setStatus(`${escapeHtml(teamNames[ct])} gets one counter answer${sub('If they beat your answer, they take the round')}`);
+      }
+      break;
     }
-    document.getElementById('player-buzz-btn').classList.remove('visible');
+    case 'play-or-pass': {
+      const w = s.faceoffWinnerTeamIndex;
+      if (mine(w)) {
+        setStatus(`YOU WON THE FACE-OFF! 🎉${sub('Tell the host — play the board, or pass it?')}`, teamColors[w]);
+      } else {
+        setStatus(`${escapeHtml(teamNames[w])} won the face-off${sub('Waiting for their play-or-pass call…')}`);
+      }
+      break;
+    }
+    case 'team-play': {
+      const c = s.controllingTeamIndex;
+      if (mine(c)) {
+        setStatus(`YOUR TEAM IS PLAYING 🎤${sub('The host will ask you one at a time')}`, teamColors[c]);
+      } else {
+        setStatus(`GET READY TO STEAL 👀${sub('Three strikes and the pot is yours to take')}`);
+      }
+      break;
+    }
+    case 'steal': {
+      const st = s.stealTeamIndex;
+      if (mine(st)) {
+        setStatus(`STEAL CHANCE! 🚨${sub('Confer as a team — ONE answer wins the whole pot')}`, teamColors[st]);
+      } else {
+        setStatus(`${escapeHtml(teamNames[st])} is trying to steal your ${currentPot} points!`, '#FF9500');
+      }
+      break;
+    }
+  }
+}
+
+// Land on the right screen for wherever the game currently is.
+function applySnapshot(s) {
+  if (!s) return;
+  if (s.teamNames)  teamNames  = s.teamNames;
+  if (s.teamColors) { teamColors = s.teamColors; myTeamColor = teamColors[myTeamIndex] || myTeamColor; }
+  if (s.scores) {
+    renderScoreCards('waiting-scores', s.scores);
+    renderScoreCards('player-scores', s.scores);
+  }
+
+  if (s.question) {
+    document.getElementById('player-question').textContent = s.question;
+    answerCount = s.answerCount;
+    buildMiniBoard(s.answerCount);
+    (s.revealed || []).forEach(r => flipTile(r.index, r.text, r.pts));
+    renderStrikes(s.strikes);
+    setPot(s.pot);
+  }
+
+  switch (s.phase) {
+    case 'faceoff':
+      showBuzzer();
+      break;
+
+    case 'faceoff-judging': {
+      const b = s.faceoff && s.faceoff.buzzer;
+      if (!b) { showScreen('screen-game'); break; }
+      if (b.playerId === playerId) {
+        showScreen('screen-buzzed');
+      } else {
+        document.getElementById('sb-team-name').textContent  = b.teamName || '';
+        document.getElementById('sb-team-name').style.color   = b.teamColor || '#fff';
+        document.getElementById('sb-player-name').textContent = b.playerName || '';
+        showScreen('screen-someone-buzzed');
+      }
+      break;
+    }
+
+    case 'faceoff-counter':
+    case 'play-or-pass':
+    case 'team-play':
+    case 'steal':
+      renderPhaseStatus(s);
+      showScreen('screen-game');
+      break;
+
+    case 'round-over':
+      renderRoundOver(s.lastRoundResult || {}, s.revealed || [], s.answerCount, s.scores);
+      break;
+
+    case 'game-over':
+      renderLeaderboard('player-final-leaderboard', s.scores);
+      showScreen('screen-game-over');
+      break;
+
+    default:
+      showScreen('screen-waiting');
+  }
+}
+
+// ── Live game events ──────────────────────────────────────────
+socket.on('question-start', ({ question, answerCount: count, scores }) => {
+  Sounds.wordReveal();
+  document.getElementById('player-question').textContent = question;
+  answerCount = count;
+  buildMiniBoard(count);
+  renderStrikes(0);
+  setPot(0);
+  setStatus('');
+  renderScoreCards('player-scores', scores);
+  // faceoff-open follows immediately and raises the buzzer.
+});
+
+socket.on('faceoff-open', ({ rebuzz }) => {
+  Sounds.go();
+  showBuzzer();
+  if (rebuzz) {
+    const hintEl = document.getElementById('buzz-hint-text');
+    if (hintEl) hintEl.textContent = 'Both missed — buzz again!';
   }
 });
 
-// ── Buzzer tap ────────────────────────────────────────────────
+// ── Buzzer (face-off only) ────────────────────────────────────
 document.getElementById('buzzer-fullscreen').addEventListener('pointerdown', (e) => {
   e.preventDefault();
   if (buzzerFired) return;
@@ -192,7 +357,7 @@ document.getElementById('buzzer-fullscreen').addEventListener('pointerdown', (e)
   const hintEl = document.getElementById('buzz-hint-text');
   if (hintEl) hintEl.textContent = 'Buzzing...';
   socket.emit('buzz');
-  // Safety reset after 2s if no server response
+  // Safety reset: if the server never responds within 2s, unlock the buzzer
   setTimeout(() => {
     if (buzzerFired && buzzer.classList.contains('buzzer-pending')) {
       buzzer.classList.remove('buzzer-pending');
@@ -202,167 +367,142 @@ document.getElementById('buzzer-fullscreen').addEventListener('pointerdown', (e)
   }, 2000);
 }, { passive: false });
 
-// Inline buzz button (fallback)
-document.getElementById('player-buzz-btn').addEventListener('click', () => {
-  if (buzzerFired) return;
-  buzzerFired = true;
-  Sounds.buzz();
-  socket.emit('buzz');
-});
-
-// ── You buzzed ────────────────────────────────────────────────
-socket.on('you-buzzed-ff', ({ teamName, teamColor, isSteal }) => {
-  Sounds.buzz();
-  const buzzer = document.getElementById('buzzer-fullscreen');
-  buzzer.classList.remove('buzzer-pending');
-  showScreen('screen-buzzed');
-});
-
-// ── Someone else buzzed ────────────────────────────────────────
-socket.on('someone-buzzed', ({ playerName, teamName, teamColor, isSteal }) => {
-  const buzzer = document.getElementById('buzzer-fullscreen');
-  if (buzzer.classList.contains('active')) {
-    buzzer.classList.remove('buzzer-pending');
-    buzzerFired = false;
-  }
-  document.getElementById('sb-team-name').textContent = teamName;
-  document.getElementById('sb-team-name').style.color  = teamColor;
-  document.getElementById('sb-player-name').textContent = playerName;
-  showScreen('screen-someone-buzzed');
-});
-
-// ── Answer revealed ────────────────────────────────────────────
-socket.on('answer-revealed', ({ answerIndex, text, pts }) => {
-  Sounds.tick(false);
-
-  const tile = document.getElementById(`p-tile-${answerIndex}`);
-  if (tile) {
-    const textEl = document.getElementById(`p-tile-text-${answerIndex}`);
-    const ptsEl  = document.getElementById(`p-tile-pts-${answerIndex}`);
-    if (textEl) textEl.textContent = text;
-    if (ptsEl)  ptsEl.textContent  = pts;
-    tile.classList.add('revealed');
-  }
-
-  // Return to game screen if we're on buzzed/someone-buzzed
-  const onBuzzedScreen = document.getElementById('screen-buzzed').classList.contains('active') ||
-                         document.getElementById('screen-someone-buzzed').classList.contains('active');
-  if (onBuzzedScreen) {
-    showScreen('screen-game');
+socket.on('faceoff-buzz', ({ playerId: pid, playerName, teamName, teamColor }) => {
+  document.getElementById('buzzer-fullscreen').classList.remove('buzzer-pending');
+  if (pid === playerId) {
+    showScreen('screen-buzzed');
+  } else {
+    document.getElementById('sb-team-name').textContent  = teamName;
+    document.getElementById('sb-team-name').style.color   = teamColor;
+    document.getElementById('sb-player-name').textContent = playerName;
+    showScreen('screen-someone-buzzed');
   }
 });
 
-// ── Wrong answer ───────────────────────────────────────────────
-socket.on('wrong-answer', ({ strikes, stealMode }) => {
+socket.on('faceoff-miss', () => {
   Sounds.noPoint();
-  document.getElementById('player-strikes').textContent = '❌'.repeat(strikes);
+  // The event that follows (faceoff-counter / faceoff-won / faceoff-open)
+  // moves everyone to the right screen.
+});
 
-  const onBuzzedScreen = document.getElementById('screen-buzzed').classList.contains('active') ||
+socket.on('faceoff-counter', ({ counterTeamIndex }) => {
+  renderPhaseStatus({ phase: 'faceoff-counter', faceoff: { counterTeamIndex } });
+  showScreen('screen-game');
+});
+
+socket.on('faceoff-won', ({ winnerTeamIndex }) => {
+  Sounds.pointAwarded();
+  renderPhaseStatus({ phase: 'play-or-pass', faceoffWinnerTeamIndex: winnerTeamIndex });
+  showScreen('screen-game');
+});
+
+socket.on('team-play-start', ({ controllingTeamIndex }) => {
+  Sounds.go();
+  renderStrikes(0);
+  renderPhaseStatus({ phase: 'team-play', controllingTeamIndex });
+  showScreen('screen-game');
+});
+
+socket.on('answer-revealed', ({ answerIndex, text, pts, pot, context }) => {
+  Sounds.pointAwarded();
+  flipTile(answerIndex, text, pts);
+  setPot(pot);
+  if (context === 'cleanup') {
+    updateRoundOverTile(answerIndex, text, pts);
+  } else {
+    // A reveal always resolves the buzzed/someone-buzzed screens.
+    const onBuzzScreen = document.getElementById('screen-buzzed').classList.contains('active') ||
                          document.getElementById('screen-someone-buzzed').classList.contains('active');
-  if (onBuzzedScreen) {
-    showScreen('screen-game');
+    if (onBuzzScreen) showScreen('screen-game');
   }
 });
 
-// ── Steal mode ─────────────────────────────────────────────────
-socket.on('steal-mode', ({ stealTeamIndex, stealTeamName, stealTeamColor, roundPot }) => {
+socket.on('wrong-answer', ({ strikes }) => {
+  Sounds.noPoint();
+  renderStrikes(strikes);
+});
+
+socket.on('steal-mode', ({ stealTeamIndex, pot }) => {
   Sounds.timeUp();
-  currentStealTeam = stealTeamIndex;
-  buzzerFired = false;
-
-  const indicator = document.getElementById('player-steal-indicator');
-  document.getElementById('player-steal-label').textContent = `STEAL: ${stealTeamName}`;
-  document.getElementById('player-steal-sub').textContent =
-    `${stealTeamName} gets one chance to steal ${roundPot} points!`;
-  indicator.classList.add('visible');
-
-  document.getElementById('player-active-team').innerHTML =
-    `<span style="color:#FF9500;font-weight:800">STEAL</span> by ${stealTeamName}`;
-
-  if (stealTeamIndex === myTeamIndex) {
-    showBuzzer();
-  } else {
-    if (!document.getElementById('screen-game').classList.contains('active')) {
-      showScreen('screen-game');
-    }
-  }
+  setPot(pot);
+  renderPhaseStatus({ phase: 'steal', stealTeamIndex });
+  showScreen('screen-game');
 });
 
-// ── Round complete ─────────────────────────────────────────────
-socket.on('round-complete', ({ scores, roundPot, winnerTeamName, winnerTeamColor, allAnswers, stealSuccess, stealFailed }) => {
-  if (stealSuccess) {
-    Sounds.pointAwarded();
-  } else if (stealFailed) {
-    Sounds.noPoint();
-  } else {
-    Sounds.pointAwarded();
-  }
+// ── Round over ────────────────────────────────────────────────
+socket.on('round-complete', (rc) => {
+  if (rc.winnerTeamIndex === myTeamIndex) Sounds.pointAwarded();
+  else Sounds.noPoint();
+  renderRoundOver(rc, rc.revealed || [], rc.answerCount, rc.scores);
+  // Stay here until the host starts the next question — no auto-return.
+});
 
-  // Reveal all tiles on mini board
-  if (allAnswers) {
-    allAnswers.forEach((ans, i) => {
-      const tile = document.getElementById(`p-tile-${i}`);
-      if (tile && !tile.classList.contains('revealed')) {
-        const textEl = document.getElementById(`p-tile-text-${i}`);
-        const ptsEl  = document.getElementById(`p-tile-pts-${i}`);
-        if (textEl) textEl.textContent = ans.t;
-        if (ptsEl)  ptsEl.textContent  = ans.p;
-        tile.classList.add('revealed');
-      }
-    });
+function roundResultText(r) {
+  if (r.winnerTeamIndex == null) return 'Round ended — no points awarded';
+  switch (r.reason) {
+    case 'board-clear':  return `Cleared the board — ${r.pot} points banked!`;
+    case 'steal':        return `STOLEN! ${r.winnerTeamName} takes ${r.pot} points`;
+    case 'steal-failed': return `Steal failed — ${r.winnerTeamName} keeps ${r.pot} points`;
+    default:             return `${r.winnerTeamName} banks ${r.pot} points`;
   }
+}
 
-  // Build round over screen
+function renderRoundOver(result, revealed, count, scores) {
   const badge = document.getElementById('player-round-winner-badge');
-  const isGold = winnerTeamColor === '#FFD60A';
-  badge.textContent = winnerTeamName;
-  badge.style.cssText = `background:${winnerTeamColor};color:${isGold ? '#111' : '#fff'}`;
-
-  const ptsEl = document.getElementById('player-round-pts-text');
-  if (stealSuccess) {
-    ptsEl.textContent = `Steal! ${winnerTeamName} wins ${roundPot} points`;
-  } else if (stealFailed) {
-    ptsEl.textContent = `Steal failed. ${winnerTeamName} keeps ${roundPot} points`;
+  if (result.winnerTeamIndex != null) {
+    const isGold = result.winnerTeamColor === '#FFD60A';
+    badge.textContent = result.winnerTeamName;
+    badge.style.cssText = `background:${result.winnerTeamColor};color:${isGold ? '#111' : '#fff'}`;
   } else {
-    ptsEl.textContent = `${winnerTeamName} wins ${roundPot} points`;
+    badge.textContent = 'No winner';
+    badge.style.cssText = 'background:rgba(255,255,255,0.1);color:#fff';
   }
+  document.getElementById('player-round-pts-text').textContent = roundResultText(result);
 
-  const revBoard = document.getElementById('player-reveal-board');
-  revBoard.innerHTML = '';
-  if (allAnswers) {
-    allAnswers.forEach(ans => {
-      const tile = document.createElement('div');
+  // Revealed answers show; the rest stay hidden until the host flips them.
+  const board = document.getElementById('player-reveal-board');
+  board.innerHTML = '';
+  const byIndex = new Map((revealed || []).map(r => [r.index, r]));
+  const total = count || answerCount;
+  for (let i = 0; i < total; i++) {
+    const r = byIndex.get(i);
+    const tile = document.createElement('div');
+    tile.id = `p-ro-tile-${i}`;
+    if (r) {
       tile.className = 'player-ro-tile';
-      tile.innerHTML = `
-        <span class="player-ro-tile-text">${ans.t}</span>
-        <span class="player-ro-tile-pts">${ans.p}</span>
-      `;
-      revBoard.appendChild(tile);
-    });
+      tile.innerHTML = `<span class="player-ro-tile-text">${escapeHtml(r.text)}</span><span class="player-ro-tile-pts">${r.pts}</span>`;
+    } else {
+      tile.className = 'player-ro-tile hidden-tile';
+      tile.innerHTML = `<span class="player-ro-tile-text">? ? ?</span>`;
+    }
+    board.appendChild(tile);
   }
 
-  renderScoreCards('player-ro-scores', scores);
-  renderScoreCards('waiting-scores', scores);
-
+  if (scores) {
+    renderScoreCards('player-ro-scores', scores);
+    renderScoreCards('waiting-scores', scores);
+  }
   showScreen('screen-round-over');
+}
 
-  // Auto-return to waiting after 6s
-  setTimeout(() => {
-    if (document.getElementById('screen-round-over').classList.contains('active')) {
-      showScreen('screen-waiting');
-    }
-  }, 6000);
-});
+// Host flipping the leftovers after the round ("let's see what else was up there")
+function updateRoundOverTile(index, text, pts) {
+  const tile = document.getElementById(`p-ro-tile-${index}`);
+  if (!tile) return;
+  tile.className = 'player-ro-tile';
+  tile.innerHTML = `<span class="player-ro-tile-text">${escapeHtml(text)}</span><span class="player-ro-tile-pts">${pts}</span>`;
+}
 
-// ── Game over ──────────────────────────────────────────────────
+// ── Game over / host gone ─────────────────────────────────────
 socket.on('game-over', ({ scores }) => {
   Sounds.gameOver();
+  clearSession();
   renderLeaderboard('player-final-leaderboard', scores);
   showScreen('screen-game-over');
 });
 
-// ── Host disconnected ──────────────────────────────────────────
 socket.on('host-disconnected', () => {
+  clearSession();
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('buzzer-fullscreen').classList.remove('active');
   document.getElementById('screen-host-disconnected').classList.add('active');
@@ -371,21 +511,21 @@ socket.on('host-disconnected', () => {
 // ── Helpers ───────────────────────────────────────────────────
 function renderScoreCards(containerId, scores) {
   const container = document.getElementById(containerId);
-  if (!container) return;
+  if (!container || !scores) return;
   container.innerHTML = '';
   scores.forEach(s => {
     const isGold = s.color === '#FFD60A';
     const card = document.createElement('div');
     card.className = 'score-card';
     card.style.cssText = `background:${s.color};color:${isGold ? '#111' : '#fff'}`;
-    card.innerHTML = `<div class="team-name">${s.name}</div><div class="score-num">${s.score}</div>`;
+    card.innerHTML = `<div class="team-name">${escapeHtml(s.name)}</div><div class="score-num">${s.score}</div>`;
     container.appendChild(card);
   });
 }
 
 function renderLeaderboard(containerId, scores) {
   const container = document.getElementById(containerId);
-  if (!container) return;
+  if (!container || !scores) return;
   container.innerHTML = '';
   [...scores].sort((a, b) => b.score - a.score).forEach((s, i) => {
     const isWinner = i === 0;
@@ -394,9 +534,13 @@ function renderLeaderboard(containerId, scores) {
     if (isWinner) row.style.cssText = `background:${s.color}22;border-color:${s.color}`;
     row.innerHTML = `
       <div class="lb-rank">${isWinner ? '👑' : i + 1}</div>
-      <div class="lb-name" style="color:${s.color}">${s.name}</div>
+      <div class="lb-name" style="color:${s.color}">${escapeHtml(s.name)}</div>
       <div class="lb-score">${s.score}</div>
     `;
     container.appendChild(row);
   });
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

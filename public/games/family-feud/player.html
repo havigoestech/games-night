@@ -38,13 +38,28 @@
       line-height: 1.4;
     }
 
-    /* Active team indicator */
-    #player-active-team {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: rgba(255,255,255,0.55);
+    /* Phase status banner */
+    #player-status {
+      width: 100%;
+      border-radius: 12px;
+      padding: 10px 14px;
       text-align: center;
-      letter-spacing: 0.04em;
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      line-height: 1.35;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.85);
+      transition: border-color 0.3s, background 0.3s;
+    }
+    #player-pot {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #FFD60A;
+      text-align: center;
+      min-height: 1.2rem;
     }
 
     /* Mini board */
@@ -115,44 +130,8 @@
       min-height: 2.2rem;
     }
 
-    /* Steal indicator */
-    #player-steal-indicator {
-      display: none;
-      background: rgba(255,149,0,0.15);
-      border: 1px solid #FF9500;
-      border-radius: 12px;
-      padding: 10px 16px;
-      text-align: center;
-      width: 100%;
-    }
-    #player-steal-indicator.visible { display: block; }
-    #player-steal-indicator .steal-label { font-family: 'Fredoka', sans-serif; font-size: 1.1rem; font-weight: 700; color: #FF9500; }
-    #player-steal-indicator .steal-sub { font-size: 0.8rem; color: rgba(255,255,255,0.6); font-weight: 600; margin-top: 3px; }
-
     /* Scores */
     #player-scores { width: 100%; }
-
-    /* Buzz button (inline fallback) */
-    #player-buzz-btn {
-      width: 100%;
-      max-width: 300px;
-      padding: 18px 24px;
-      border: none;
-      border-radius: 20px;
-      font-family: 'Fredoka', sans-serif;
-      font-size: 1.4rem;
-      font-weight: 700;
-      cursor: pointer;
-      background: #FF2D55;
-      color: #fff;
-      display: none;
-      animation: buzz-pulse 1.2s ease-in-out infinite;
-    }
-    #player-buzz-btn.visible { display: block; }
-    @keyframes buzz-pulse {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,45,85,0.5); }
-      50% { transform: scale(1.03); box-shadow: 0 0 0 12px rgba(255,45,85,0); }
-    }
 
     /* Full-screen buzzer */
     #buzzer-fullscreen.buzzer-pending { opacity: 0.75; }
@@ -170,6 +149,8 @@
     .player-ro-tile { background: #1e5c34; border-radius: 10px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
     .player-ro-tile-text { font-size: 0.72rem; font-weight: 700; color: #FFD60A; flex: 1; line-height: 1.3; text-align: left; }
     .player-ro-tile-pts { font-family: 'Fredoka', sans-serif; font-size: 1.1rem; font-weight: 700; color: #FFD60A; flex-shrink: 0; }
+    .player-ro-tile.hidden-tile { background: #1a3a6b; justify-content: center; }
+    .player-ro-tile.hidden-tile .player-ro-tile-text { color: rgba(255,255,255,0.4); text-align: center; flex: 0 1 auto; }
 
     /* Game over */
     #screen-game-over { justify-content: flex-start; padding-top: 40px; }
@@ -224,15 +205,11 @@
   <div id="screen-game" class="screen col center gap-0">
     <div class="player-game-inner">
       <div id="player-question">Question</div>
-      <div id="player-active-team"></div>
+      <div id="player-status"></div>
       <div id="player-board"></div>
+      <div id="player-pot"></div>
       <div id="player-strikes"></div>
-      <div id="player-steal-indicator">
-        <div class="steal-label" id="player-steal-label">STEAL!</div>
-        <div class="steal-sub" id="player-steal-sub"></div>
-      </div>
       <div class="score-grid" id="player-scores"></div>
-      <button class="btn btn-primary" id="player-buzz-btn" style="width:100%;max-width:300px">BUZZ IN</button>
     </div>
   </div>
 
@@ -266,7 +243,7 @@
       <div class="player-winner-badge" id="player-round-winner-badge"></div>
       <div id="player-round-pts-text" style="font-family:'Fredoka',sans-serif;font-size:1rem;color:rgba(255,255,255,0.65);font-weight:600"></div>
       <div style="width:100%">
-        <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin-bottom:8px;text-align:center">All Answers</div>
+        <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin-bottom:8px;text-align:center">The Board</div>
         <div id="player-reveal-board"></div>
       </div>
       <div style="width:100%">

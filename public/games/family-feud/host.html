@@ -12,10 +12,6 @@
     .back-link { display: inline-flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.4); font-size: 0.85rem; font-weight: 700; text-decoration: none; margin-bottom: 8px; }
     .back-link:hover { color: rgba(255,255,255,0.7); }
     .section-label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 10px; }
-    .team-count-row { display: flex; align-items: center; gap: 16px; justify-content: center; margin-bottom: 20px; }
-    .count-btn { width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: #fff; font-size: 1.4rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
-    .count-btn:hover { background: rgba(255,255,255,0.15); }
-    .count-num { font-family: 'Fredoka', sans-serif; font-size: 2.5rem; font-weight: 700; min-width: 48px; text-align: center; }
 
     /* Lobby */
     .lobby-code-section { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; justify-content: center; margin-bottom: 24px; }
@@ -180,23 +176,66 @@
       text-align: center;
     }
 
-    /* Buzzed player display */
-    .ff-buzzed-display {
-      display: none;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 18px;
-      border-radius: 14px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
-      width: 100%;
-      max-width: 480px;
+    /* Pot chip */
+    #ff-pot {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #FFD60A;
+      background: rgba(255,214,10,0.12);
+      border: 1px solid rgba(255,214,10,0.35);
+      border-radius: 20px;
+      padding: 6px 18px;
     }
-    .ff-buzzed-display.visible { display: flex; }
-    .ff-buzzed-team-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
-    .ff-buzzed-info { display: flex; flex-direction: column; align-items: flex-start; }
-    .ff-buzzed-name { font-family: 'Fredoka', sans-serif; font-size: 1.1rem; font-weight: 700; }
-    .ff-buzzed-team { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
+
+    /* Phase status strip — who buzzed, whose counter, play/pass, steal */
+    #ff-status {
+      width: 100%;
+      border-radius: 16px;
+      padding: 14px 20px;
+      text-align: center;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.1);
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .ff-status-main {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.35;
+    }
+    .ff-status-sub {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: rgba(255,255,255,0.6);
+      margin-top: 4px;
+    }
+    .ff-status-buzzer-dot {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    /* Play-or-pass buttons */
+    .ff-pop-row { display: flex; gap: 12px; justify-content: center; margin-top: 12px; }
+    .btn-pop {
+      flex: 1;
+      max-width: 200px;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 14px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      color: #fff;
+      transition: transform 0.1s, opacity 0.15s;
+    }
+    .btn-pop:active { transform: scale(0.96); }
+    .btn-pop.pass { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: rgba(255,255,255,0.8); }
 
     /* Host controls section */
     .host-controls-section {
@@ -214,33 +253,81 @@
       margin-bottom: 10px;
       text-align: center;
     }
-    #ff-reveal-btns {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 8px;
-      margin-bottom: 12px;
+    /* ── Answer key: the host sees every answer + points, always ── */
+    #ff-answer-key {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
     }
-    .ff-reveal-answer-btn {
+    .ff-key-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
       padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.15);
-      background: rgba(30,92,52,0.25);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: opacity 0.2s, background 0.2s;
+    }
+    .ff-key-rank {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.45);
+      width: 26px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .ff-key-text {
+      flex: 1;
+      text-align: left;
+      font-size: 1rem;
+      font-weight: 700;
       color: #fff;
-      font-family: 'Nunito', sans-serif;
-      font-size: 0.85rem;
+      line-height: 1.3;
+    }
+    .ff-key-pts {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #FFD60A;
+      flex-shrink: 0;
+      min-width: 44px;
+      text-align: right;
+    }
+    .btn-key-reveal {
+      flex-shrink: 0;
+      padding: 8px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(52,199,89,0.5);
+      background: rgba(52,199,89,0.18);
+      color: #34C759;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.9rem;
       font-weight: 700;
       cursor: pointer;
-      text-align: left;
-      transition: background 0.15s, opacity 0.15s;
+      transition: background 0.15s;
+      min-width: 92px;
     }
-    .ff-reveal-answer-btn:hover { background: rgba(30,92,52,0.5); }
-    .ff-reveal-answer-btn.used {
-      opacity: 0.38;
-      text-decoration: line-through;
-      cursor: default;
-      pointer-events: none;
+    .btn-key-reveal:hover:not(:disabled) { background: rgba(52,199,89,0.35); }
+    .btn-key-reveal:disabled { opacity: 0.3; cursor: not-allowed; }
+    .ff-key-row.revealed { background: rgba(30,92,52,0.35); border-color: rgba(52,199,89,0.4); }
+    .ff-key-row.revealed .ff-key-text { color: #FFD60A; }
+    .ff-key-got {
+      flex-shrink: 0;
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 5px 10px;
+      border-radius: 20px;
+      min-width: 92px;
+      text-align: center;
+      color: #fff;
     }
     .host-action-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .btn-wrong-answer:disabled, .btn-end-round-host:disabled { opacity: 0.3; cursor: not-allowed; }
     .btn-wrong-answer {
       flex: 1;
       min-width: 140px;
@@ -286,30 +373,6 @@
     }
     .btn-end-game-sm:hover { color: #FF2D55; }
 
-    /* Steal mode banner */
-    .ff-steal-banner {
-      display: none;
-      width: 100%;
-      background: rgba(255,149,0,0.15);
-      border: 1px solid #FF9500;
-      border-radius: 14px;
-      padding: 14px 20px;
-      text-align: center;
-    }
-    .ff-steal-banner.visible { display: block; }
-    .ff-steal-banner-title {
-      font-family: 'Fredoka', sans-serif;
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: #FF9500;
-    }
-    .ff-steal-banner-sub {
-      font-size: 0.85rem;
-      color: rgba(255,255,255,0.6);
-      font-weight: 600;
-      margin-top: 4px;
-    }
-
     /* Round over */
     #screen-round-over { justify-content: flex-start; padding-top: 32px; }
     .ff-round-over-inner { width: 100%; max-width: 700px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
@@ -345,6 +408,22 @@
     }
     .ff-ro-tile-text { font-size: 0.8rem; font-weight: 700; color: #FFD60A; flex: 1; text-align: left; line-height: 1.3; }
     .ff-ro-tile-pts { font-family: 'Fredoka', sans-serif; font-size: 1.3rem; font-weight: 700; color: #FFD60A; flex-shrink: 0; }
+    /* Unrevealed answers after the round — host can flip them for the room */
+    .ff-ro-tile.hidden-tile { background: #1a3a6b; }
+    .ff-ro-tile.hidden-tile .ff-ro-tile-text { color: rgba(255,255,255,0.75); }
+    .btn-ro-show {
+      flex-shrink: 0;
+      padding: 5px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-ro-show:hover { background: rgba(255,255,255,0.2); }
 
     /* Game over */
     #screen-game-over { justify-content: flex-start; padding-top: 40px; }
@@ -358,17 +437,9 @@
       <a href="/" class="back-link">← Games Night</a>
       <span style="font-size:3rem">🎯</span>
       <h1 class="heading" style="font-size:2.2rem">Family Feud</h1>
-      <p style="color:var(--text-muted);font-size:0.95rem">Set up your teams, then share the room code.</p>
+      <p style="color:var(--text-muted);font-size:0.95rem">Two families, head to head. Name your teams and share the code.</p>
     </div>
     <div class="card col gap-16">
-      <div>
-        <div class="section-label">Number of Teams</div>
-        <div class="team-count-row">
-          <button class="count-btn" id="count-down">−</button>
-          <div class="count-num" id="team-count-display">4</div>
-          <button class="count-btn" id="count-up">+</button>
-        </div>
-      </div>
       <div>
         <div class="section-label">Team Names</div>
         <div id="team-name-inputs" class="col gap-8"></div>
@@ -408,19 +479,17 @@
       <!-- Team score bars -->
       <div class="ff-teams-bar" id="ff-teams-bar"></div>
 
-      <!-- Buzzed player display -->
-      <div class="ff-buzzed-display" id="ff-buzzed-display">
-        <div class="ff-buzzed-team-dot" id="ff-buzzed-dot"></div>
-        <div class="ff-buzzed-info">
-          <div class="ff-buzzed-name" id="ff-buzzed-name"></div>
-          <div class="ff-buzzed-team" id="ff-buzzed-team-label"></div>
-        </div>
-      </div>
+      <!-- Round pot -->
+      <div id="ff-pot">Round pot: 0</div>
 
-      <!-- Steal mode banner -->
-      <div class="ff-steal-banner" id="ff-steal-banner">
-        <div class="ff-steal-banner-title" id="ff-steal-banner-title">STEAL!</div>
-        <div class="ff-steal-banner-sub" id="ff-steal-banner-sub"></div>
+      <!-- Phase status: who buzzed / whose counter / play-or-pass / steal -->
+      <div id="ff-status">
+        <div class="ff-status-main" id="ff-status-main">Waiting…</div>
+        <div class="ff-status-sub" id="ff-status-sub"></div>
+        <div class="ff-pop-row" id="ff-pop-row" style="display:none">
+          <button class="btn-pop" id="btn-play">PLAY the board</button>
+          <button class="btn-pop pass" id="btn-pass">PASS to the other team</button>
+        </div>
       </div>
 
       <!-- Question -->
@@ -428,7 +497,7 @@
         <div id="ff-question">Question will appear here</div>
       </div>
 
-      <!-- Board -->
+      <!-- Board (audience-facing mirror of what players see) -->
       <div id="ff-board"></div>
 
       <!-- Strikes -->
@@ -436,10 +505,10 @@
 
       <!-- HOST CONTROLS -->
       <div class="host-controls-section" style="width:100%;max-width:900px">
-        <div class="host-controls-label">Host Controls</div>
-        <div id="ff-reveal-btns"></div>
+        <div class="host-controls-label">Answer Key — only you can see this</div>
+        <div id="ff-answer-key"></div>
         <div class="host-action-row">
-          <button class="btn-wrong-answer" id="btn-wrong">Wrong Answer ❌</button>
+          <button class="btn-wrong-answer" id="btn-wrong">Not on the Board ❌</button>
           <button class="btn-end-round-host" id="btn-end-round">End Round</button>
           <button class="btn-end-game-sm" id="btn-end-game-game">End Game</button>
         </div>
@@ -455,7 +524,7 @@
       <div class="ff-winner-badge" id="ro-winner-badge"></div>
       <div class="ff-points-gained" id="ro-points-gained"></div>
       <div style="width:100%">
-        <div class="section-label mb-8" style="text-align:left">All Answers</div>
+        <div class="section-label mb-8" style="text-align:left">The Board — show the room what they missed</div>
         <div id="ro-reveal-board"></div>
       </div>
       <div style="width:100%">

@@ -1,16 +1,21 @@
 const socket = io('/family-feud');
 
-const TEAM_COLORS = ['#FF2D55','#5856D6','#FF9500','#34C759','#00C7BE','#FF375F','#BF5AF2','#FFD60A'];
+const TEAM_COLORS = ['#FF2D55', '#5856D6'];
 
-let teamCount = 4;
 let allPlayers = [];
 let currentScores = [];
-let currentQuestion = null;
-let revealedAnswers = [];
-let activeTeamIndex = 0;
-let stealTeamIndex = -1;
-let strikes = 0;
-let roundPot = 0;
+let answers = [];          // the full answer key — host only
+let answerCount = 0;
+let revealedIndices = [];
+let revealedBy = {};       // answerIndex → teamIndex | null
+let pot = 0;
+let phase = 'lobby';
+let faceoffBuzzer = null;
+let counterTeamIndex = null;
+let firstAnswer = null;
+let faceoffWinnerTeamIndex = null;
+let controllingTeamIndex = null;
+let stealTeamIndex = null;
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -23,28 +28,20 @@ function dbg(msg) {
   if (el) el.textContent = msg;
 }
 
-// ── Setup ──────────────────────────────────────────────────────
-const countDisplay   = document.getElementById('team-count-display');
-const teamNameInputs = document.getElementById('team-name-inputs');
-
-function renderTeamInputs() {
-  teamNameInputs.innerHTML = '';
-  for (let i = 0; i < teamCount; i++) {
-    const row = document.createElement('div');
-    row.className = 'team-input-row';
-    row.innerHTML = `
-      <div class="team-dot" style="background:${TEAM_COLORS[i]}"></div>
-      <input type="text" placeholder="Team ${i + 1}" maxlength="20" id="team-name-${i}">
-    `;
-    teamNameInputs.appendChild(row);
-  }
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-document.getElementById('count-down').addEventListener('click', () => {
-  if (teamCount > 2) { teamCount--; countDisplay.textContent = teamCount; renderTeamInputs(); }
-});
-document.getElementById('count-up').addEventListener('click', () => {
-  if (teamCount < 8) { teamCount++; countDisplay.textContent = teamCount; renderTeamInputs(); }
+// ── Setup (always exactly 2 teams — it's a head-to-head game) ──
+const teamNameInputs = document.getElementById('team-name-inputs');
+['Team 1', 'Team 2'].forEach((placeholder, i) => {
+  const row = document.createElement('div');
+  row.className = 'team-input-row';
+  row.innerHTML = `
+    <div class="team-dot" style="background:${TEAM_COLORS[i]}"></div>
+    <input type="text" placeholder="${placeholder}" maxlength="20" id="team-name-${i}">
+  `;
+  teamNameInputs.appendChild(row);
 });
 
 document.getElementById('btn-create').addEventListener('click', () => {
@@ -54,43 +51,31 @@ document.getElementById('btn-create').addEventListener('click', () => {
   btn.disabled = true;
   dbg('Connecting...');
 
-  const teamNames = Array.from({ length: teamCount }, (_, i) => {
+  const teamNames = [0, 1].map(i => {
     const el = document.getElementById(`team-name-${i}`);
     return el ? el.value.trim() : '';
   });
-  socket.emit('create-room', {
-    teamCount,
-    teamNames,
-    baseUrl: `${location.protocol}//${location.host}`
-  });
+  socket.emit('create-room', { teamNames, baseUrl: `${location.protocol}//${location.host}` });
 
   setTimeout(() => { btn.textContent = 'Create Room'; btn.disabled = false; dbg(''); }, 8000);
 });
 
-renderTeamInputs();
-
 // ── Lobby ──────────────────────────────────────────────────────
-socket.on('room-created', (data) => {
-  try {
-    const { roomCode, joinUrl, localIP, port, teams } = data;
-    document.getElementById('btn-create').textContent = 'Create Room';
-    document.getElementById('btn-create').disabled = false;
-    dbg('');
+socket.on('room-created', ({ roomCode, joinUrl, localIP, port, teams }) => {
+  document.getElementById('btn-create').textContent = 'Create Room';
+  document.getElementById('btn-create').disabled = false;
+  dbg('');
 
-    currentScores = teams.map((t, i) => ({ index: i, name: t.name, color: t.color, score: 0 }));
-    allPlayers = [];
+  currentScores = teams.map((t, i) => ({ index: i, name: t.name, color: t.color, score: 0 }));
+  allPlayers = [];
 
-    document.getElementById('lobby-room-code').textContent = roomCode;
-    document.getElementById('lobby-join-url').textContent = joinUrl;
+  document.getElementById('lobby-room-code').textContent = roomCode;
+  document.getElementById('lobby-join-url').textContent = joinUrl;
+  const ipEl = document.getElementById('lobby-player-address');
+  if (ipEl) ipEl.innerHTML = `Players go to: <strong>http://${localIP}:${port}</strong>`;
 
-    const ipEl = document.getElementById('lobby-player-address');
-    if (ipEl) ipEl.innerHTML = `Players go to: <strong>http://${localIP}:${port}</strong>`;
-
-    renderPlayerGroups(teams);
-    showScreen('screen-lobby');
-  } catch (err) {
-    dbg('Error: ' + err.message);
-  }
+  renderPlayerGroups();
+  showScreen('screen-lobby');
 });
 
 socket.on('qr-ready', ({ qrDataUrl }) => {
@@ -106,80 +91,93 @@ socket.on('create-room-error', ({ message }) => {
   dbg('Error: ' + message);
 });
 
-socket.on('player-joined', ({ allPlayers: players }) => {
+// Single source of truth for the roster — join, rejoin, and disconnect.
+// Disconnected players stay listed (marked away) rather than vanishing.
+socket.on('players-update', ({ allPlayers: players, scores }) => {
   allPlayers = players;
+  if (scores) currentScores = scores;
   document.getElementById('player-count').textContent = players.length;
-  renderPlayerGroups(currentScores.map(s => ({ name: s.name, color: s.color })));
-  document.getElementById('btn-end-game-lobby').style.display = 'block';
+  renderPlayerGroups();
 });
 
-socket.on('player-left', ({ allPlayers: players }) => {
-  allPlayers = players;
-  document.getElementById('player-count').textContent = players.length;
-  renderPlayerGroups(currentScores.map(s => ({ name: s.name, color: s.color })));
-});
-
-function renderPlayerGroups(teams) {
+function renderPlayerGroups() {
   const container = document.getElementById('player-groups');
   container.innerHTML = '';
-  teams.forEach((team, i) => {
-    const members = allPlayers.filter(p => p.teamIndex === i).map(p => p.name);
+  currentScores.forEach((team, i) => {
+    const members = allPlayers.filter(p => p.teamIndex === i);
+    const list = members.length
+      ? members.map(p => `<span${p.connected === false ? ' style="opacity:0.45"' : ''}>${escapeHtml(p.name)}${p.connected === false ? ' (away)' : ''}</span>`).join(', ')
+      : 'No players yet';
     const div = document.createElement('div');
     div.className = 'player-group';
     div.innerHTML = `
-      <div class="player-group-header" style="color:${team.color}">${team.name}</div>
-      <div class="player-group-members">${members.length ? members.join(', ') : 'No players yet'}</div>
+      <div class="player-group-header" style="color:${team.color}">${escapeHtml(team.name)}</div>
+      <div class="player-group-members">${list}</div>
     `;
     container.appendChild(div);
   });
 }
 
-document.getElementById('btn-start-game').addEventListener('click', () => {
-  socket.emit('start-question');
-});
+document.getElementById('btn-start-game').addEventListener('click', () => socket.emit('start-question'));
 document.getElementById('btn-end-game-lobby').addEventListener('click', () => {
   if (confirm('End the game now?')) socket.emit('end-game');
 });
 
-// ── Game: question start ───────────────────────────────────────
-socket.on('question-start', (data) => {
-  Sounds.wordReveal();
+// ── Team bar ───────────────────────────────────────────────────
+function renderTeamsBar() {
+  const bar = document.getElementById('ff-teams-bar');
+  bar.innerHTML = '';
+  currentScores.forEach((team, i) => {
+    const isGold = team.color === '#FFD60A';
+    let badge = '';
+    let cls = 'ff-team-card';
 
-  currentQuestion = { q: data.question, answerCount: data.answerCount };
-  activeTeamIndex = data.activeTeamIndex;
-  revealedAnswers = [];
-  strikes = 0;
-  roundPot = 0;
-  stealTeamIndex = -1;
+    if (phase === 'faceoff' || phase === 'faceoff-judging' || phase === 'faceoff-counter') {
+      badge = '<div class="ff-team-badge-label">FACE-OFF</div>';
+      if (phase === 'faceoff-counter' && i === counterTeamIndex) {
+        badge = '<div class="ff-team-badge-label">COUNTER</div>';
+        cls += ' active-team';
+      } else if (phase === 'faceoff-judging' && faceoffBuzzer && i === faceoffBuzzer.teamIndex) {
+        badge = '<div class="ff-team-badge-label">BUZZED</div>';
+        cls += ' active-team';
+      }
+    } else if (phase === 'play-or-pass' && i === faceoffWinnerTeamIndex) {
+      badge = '<div class="ff-team-badge-label">WON FACE-OFF</div>';
+      cls += ' active-team';
+    } else if (phase === 'team-play' && i === controllingTeamIndex) {
+      badge = '<div class="ff-team-badge-label">PLAYING</div>';
+      cls += ' active-team';
+    } else if (phase === 'steal' && i === stealTeamIndex) {
+      badge = '<div class="ff-team-badge-label steal-badge">STEAL!</div>';
+      cls += ' steal-team';
+    }
 
-  currentScores = data.scores;
+    const card = document.createElement('div');
+    card.className = cls;
+    card.style.cssText = `background:${team.color};color:${isGold ? '#111' : '#fff'}`;
+    card.innerHTML = `
+      ${badge}
+      <div class="ff-team-name-label">${escapeHtml(team.name)}</div>
+      <div class="ff-team-score-num">${team.score}</div>
+    `;
+    bar.appendChild(card);
+  });
+}
 
-  document.getElementById('ff-question').textContent = data.question;
-  document.getElementById('ff-strikes').textContent = '';
-
-  hideBuzzedDisplay();
-  hideStealBanner();
-
-  buildBoard(data.answerCount);
-  buildRevealButtons(data.answerCount);
-  renderTeamsBars(data.scores, data.activeTeamIndex, -1);
-
-  showScreen('screen-game');
-});
-
+// ── Board (mirrors what players see) ───────────────────────────
 function buildBoard(count) {
   const board = document.getElementById('ff-board');
   board.innerHTML = '';
   for (let i = 0; i < count; i++) {
     const tile = document.createElement('div');
     tile.className = 'ff-tile';
-    tile.id = `ff-tile-${i}`;
+    tile.id = `tile-${i}`;
     tile.innerHTML = `
       <div class="ff-tile-inner">
         <div class="ff-tile-front">${i + 1}</div>
         <div class="ff-tile-back">
-          <span class="ff-answer-text" id="ff-tile-text-${i}"></span>
-          <span class="ff-answer-pts" id="ff-tile-pts-${i}"></span>
+          <span class="ff-answer-text" id="tile-text-${i}"></span>
+          <span class="ff-answer-pts"  id="tile-pts-${i}"></span>
         </div>
       </div>
     `;
@@ -187,256 +185,344 @@ function buildBoard(count) {
   }
 }
 
-function buildRevealButtons(count) {
-  // Buttons will be filled in when question data arrives via answer-revealed
-  // but we pre-build them as unknown (no text yet) from the question bank
-  // Actually we need the answer texts. We'll use a placeholder and fill from server events.
-  // Since the host has no answer text until reveal, we build numbered placeholders
-  // that get updated on reveal. However, host needs to be able to click them to reveal.
-  // We store the answer list when we build buttons and populate from the question data
-  // passed in question-start. Unfortunately question-start only passes count, not answers.
-  // So we build numbered buttons; text fills in on reveal. Host clicks by number.
-  const container = document.getElementById('ff-reveal-btns');
-  container.innerHTML = '';
-  for (let i = 0; i < count; i++) {
-    const btn = document.createElement('button');
-    btn.className = 'ff-reveal-answer-btn';
-    btn.id = `ff-reveal-btn-${i}`;
-    btn.textContent = `Answer ${i + 1}`;
-    btn.dataset.index = i;
-    btn.addEventListener('click', () => {
+function flipTile(index, text, pts) {
+  const tile = document.getElementById(`tile-${index}`);
+  if (!tile) return;
+  const t = document.getElementById(`tile-text-${index}`);
+  const p = document.getElementById(`tile-pts-${index}`);
+  if (t) t.textContent = text;
+  if (p) p.textContent = pts;
+  tile.classList.add('revealed');
+}
+
+// ── Answer key (host only — text + points visible from round start) ──
+function buildAnswerKey() {
+  const key = document.getElementById('ff-answer-key');
+  key.innerHTML = '';
+  answers.forEach((a, i) => {
+    const row = document.createElement('div');
+    row.className = 'ff-key-row';
+    row.id = `key-row-${i}`;
+    row.innerHTML = `
+      <div class="ff-key-rank">#${i + 1}</div>
+      <div class="ff-key-text">${escapeHtml(a.t)}</div>
+      <div class="ff-key-pts">${a.p}</div>
+      <button class="btn-key-reveal" id="key-btn-${i}">Reveal</button>
+    `;
+    row.querySelector(`#key-btn-${i}`).addEventListener('click', () => {
       socket.emit('reveal-answer', { answerIndex: i });
     });
-    container.appendChild(btn);
+    key.appendChild(row);
+  });
+  refreshKeyButtons();
+}
+
+function markKeyRevealed(index, teamIndex) {
+  const row = document.getElementById(`key-row-${index}`);
+  if (!row) return;
+  row.classList.add('revealed');
+  const btn = document.getElementById(`key-btn-${index}`);
+  if (btn) {
+    const chip = document.createElement('div');
+    chip.className = 'ff-key-got';
+    if (teamIndex == null) {
+      chip.style.background = 'rgba(255,255,255,0.15)';
+      chip.textContent = 'Not said';
+    } else {
+      const team = currentScores[teamIndex];
+      const isGold = team.color === '#FFD60A';
+      chip.style.background = team.color;
+      chip.style.color = isGold ? '#111' : '#fff';
+      chip.textContent = team.name;
+    }
+    btn.replaceWith(chip);
   }
 }
 
-function renderTeamsBars(scores, activeIdx, stealIdx) {
-  const bar = document.getElementById('ff-teams-bar');
-  bar.innerHTML = '';
-  scores.forEach(s => {
-    const isGold = s.color === '#FFD60A';
-    const isActive = s.index === activeIdx;
-    const isSteal  = s.index === stealIdx;
-    const card = document.createElement('div');
-    card.className = 'ff-team-card' +
-      (isActive && stealIdx < 0 ? ' active-team' : '') +
-      (isSteal ? ' steal-team' : '');
-    card.style.cssText = `background:${s.color}22;color:${s.color}`;
+// One place decides which controls are live — so a mid-game reconnect
+// can never leave the host with a stuck button.
+const REVEAL_PHASES = ['faceoff-judging', 'faceoff-counter', 'team-play', 'steal', 'round-over'];
 
-    let badge = '';
-    if (isActive && stealIdx < 0) {
-      badge = `<span class="ff-team-badge-label">PLAYING</span>`;
-    } else if (isSteal) {
-      badge = `<span class="ff-team-badge-label steal-badge">STEAL!</span>`;
-    }
-
-    card.innerHTML = `
-      ${badge}
-      <div class="ff-team-name-label" style="color:${isGold ? '#111' : '#fff'}">${s.name}</div>
-      <div class="ff-team-score-num" style="color:${s.color}">${s.score}</div>
-    `;
-    bar.appendChild(card);
+function refreshKeyButtons() {
+  const canReveal = REVEAL_PHASES.includes(phase);
+  answers.forEach((_, i) => {
+    const btn = document.getElementById(`key-btn-${i}`);
+    if (!btn) return;                       // already revealed → replaced by a chip
+    btn.disabled = !canReveal;
+    btn.textContent = phase === 'round-over' ? 'Show' : 'Reveal';
   });
 }
 
-function hideBuzzedDisplay() {
-  const el = document.getElementById('ff-buzzed-display');
-  if (el) el.classList.remove('visible');
+const WRONG_LABELS = {
+  'faceoff-judging': 'Not on the Board ❌',
+  'faceoff-counter': 'Not on the Board ❌',
+  'team-play':       'Strike ❌',
+  'steal':           'Steal Failed ❌'
+};
+
+function setPhase(p) {
+  phase = p;
+  const wrongBtn = document.getElementById('btn-wrong');
+  const label = WRONG_LABELS[p];
+  wrongBtn.disabled = !label;
+  wrongBtn.textContent = label || 'Not on the Board ❌';
+
+  const endRoundBtn = document.getElementById('btn-end-round');
+  endRoundBtn.disabled = ['lobby', 'round-over', 'game-over'].includes(p);
+
+  document.getElementById('ff-pop-row').style.display = p === 'play-or-pass' ? 'flex' : 'none';
+
+  refreshKeyButtons();
+  renderTeamsBar();
 }
 
-function hideStealBanner() {
-  const el = document.getElementById('ff-steal-banner');
-  if (el) el.classList.remove('visible');
+// ── Status strip ───────────────────────────────────────────────
+function setStatus(main, sub, color) {
+  document.getElementById('ff-status-main').innerHTML = main;
+  document.getElementById('ff-status-sub').textContent = sub || '';
+  const strip = document.getElementById('ff-status');
+  strip.style.borderColor = color || 'rgba(255,255,255,0.1)';
+  strip.style.background  = color ? `${color}22` : 'rgba(255,255,255,0.05)';
 }
 
-// ── Game: answer revealed ──────────────────────────────────────
-socket.on('answer-revealed', ({ answerIndex, text, pts, revealedAnswers: revealed }) => {
-  Sounds.pointAwarded();
+function setPot(p) {
+  pot = p || 0;
+  document.getElementById('ff-pot').textContent = `Round pot: ${pot}`;
+}
 
-  revealedAnswers = revealed;
+function renderStrikes(n) {
+  document.getElementById('ff-strikes').textContent = '❌'.repeat(n || 0);
+}
 
-  // Update tile
-  const tile = document.getElementById(`ff-tile-${answerIndex}`);
-  if (tile) {
-    document.getElementById(`ff-tile-text-${answerIndex}`).textContent = text;
-    document.getElementById(`ff-tile-pts-${answerIndex}`).textContent = pts;
-    tile.classList.add('revealed');
-  }
+// ── Question start ─────────────────────────────────────────────
+socket.on('question-start', (d) => {
+  Sounds.wordReveal();
+  answers = d.answers || [];       // host-only payload
+  answerCount = d.answerCount;
+  revealedIndices = [];
+  revealedBy = {};
+  faceoffBuzzer = null;
+  counterTeamIndex = null;
+  firstAnswer = null;
+  faceoffWinnerTeamIndex = null;
+  controllingTeamIndex = null;
+  stealTeamIndex = null;
+  if (d.scores) currentScores = d.scores;
 
-  // Update reveal button text and mark used
-  const btn = document.getElementById(`ff-reveal-btn-${answerIndex}`);
-  if (btn) {
-    btn.textContent = `${text} (${pts})`;
-    btn.classList.add('used');
-  }
-
-  hideBuzzedDisplay();
+  document.getElementById('ff-question').textContent = d.question;
+  buildBoard(answerCount);
+  buildAnswerKey();
+  renderStrikes(0);
+  setPot(0);
+  showScreen('screen-game');
 });
 
-// ── Game: wrong answer ─────────────────────────────────────────
-socket.on('wrong-answer', ({ strikes: s, stealMode }) => {
-  Sounds.noPoint();
-  strikes = s;
-  document.getElementById('ff-strikes').textContent = '❌'.repeat(strikes);
-  hideBuzzedDisplay();
-
-  if (stealMode) {
-    // steal-mode event will follow
-  }
+socket.on('faceoff-open', ({ rebuzz }) => {
+  Sounds.go();
+  faceoffBuzzer = null;
+  setPhase('faceoff');
+  setStatus(
+    '🔔 FACE-OFF — waiting for a buzz…',
+    rebuzz ? 'Both teams missed — buzzers are open again' : 'Everyone can buzz. First in gets to answer.'
+  );
 });
 
-// ── Game: steal mode ───────────────────────────────────────────
-socket.on('steal-mode', ({ stealTeamIndex: si, stealTeamName, stealTeamColor, roundPot: pot }) => {
-  Sounds.timeUp();
-  stealTeamIndex = si;
-  roundPot = pot;
-
-  renderTeamsBars(currentScores, activeTeamIndex, stealTeamIndex);
-
-  const banner = document.getElementById('ff-steal-banner');
-  document.getElementById('ff-steal-banner-title').textContent = `STEAL: ${stealTeamName}`;
-  document.getElementById('ff-steal-banner-sub').textContent =
-    `${stealTeamName} can steal ${pot} points with one answer!`;
-  banner.classList.add('visible');
-});
-
-// ── Game: player buzzed ────────────────────────────────────────
-socket.on('player-buzzed', ({ playerName, teamName, teamColor, isSteal }) => {
+socket.on('faceoff-buzz', ({ playerName, teamIndex, teamName, teamColor }) => {
   Sounds.buzz();
-
-  const display = document.getElementById('ff-buzzed-display');
-  const dot = document.getElementById('ff-buzzed-dot');
-  const nameEl = document.getElementById('ff-buzzed-name');
-  const teamEl = document.getElementById('ff-buzzed-team-label');
-
-  dot.style.background = teamColor;
-  nameEl.textContent = playerName;
-  teamEl.textContent = isSteal ? `${teamName} (STEAL)` : teamName;
-  display.classList.add('visible');
+  faceoffBuzzer = { playerName, teamIndex, teamName, teamColor };
+  setPhase('faceoff-judging');
+  setStatus(
+    `<span class="ff-status-buzzer-dot" style="background:${teamColor}"></span><strong>${escapeHtml(playerName)}</strong> buzzed first &nbsp;·&nbsp; ${escapeHtml(teamName)}`,
+    'Judge their answer: hit Reveal on the matching row, or Not on the Board',
+    teamColor
+  );
 });
 
-// ── Game: buzzers live ─────────────────────────────────────────
-socket.on('buzzers-live', ({ activeTeamIndex: ati }) => {
-  activeTeamIndex = ati;
-  hideBuzzedDisplay();
-  renderTeamsBars(currentScores, activeTeamIndex, stealTeamIndex);
+socket.on('faceoff-counter', ({ counterTeamIndex: ct, counterTeamName, counterTeamColor, firstAnswer: fa }) => {
+  counterTeamIndex = ct;
+  firstAnswer = fa;
+  setPhase('faceoff-counter');
+  const context = fa.answerIndex === null
+    ? 'The first team missed — any answer wins them the face-off'
+    : `First answer was #${fa.answerIndex + 1} (${answers[fa.answerIndex].p} pts) — they must beat it`;
+  setStatus(
+    `<strong>${escapeHtml(counterTeamName)}</strong>'s counter — ONE answer`,
+    context,
+    counterTeamColor
+  );
 });
 
-// ── Round complete ─────────────────────────────────────────────
-socket.on('round-complete', ({ scores, roundPot: pot, winnerTeamName, winnerTeamColor, allAnswers, stealSuccess, stealFailed }) => {
-  currentScores = scores;
-  stealTeamIndex = -1;
+socket.on('faceoff-won', ({ winnerTeamIndex, winnerTeamName, winnerTeamColor }) => {
+  Sounds.pointAwarded();
+  faceoffWinnerTeamIndex = winnerTeamIndex;
+  setPhase('play-or-pass');
+  setStatus(
+    `<strong>${escapeHtml(winnerTeamName)}</strong> won the face-off!`,
+    'Ask them: play the board, or pass it to the other team?',
+    winnerTeamColor
+  );
+});
 
-  // Reveal any unrevealed tiles
-  if (allAnswers) {
-    allAnswers.forEach((ans, i) => {
-      const tile = document.getElementById(`ff-tile-${i}`);
-      if (tile && !tile.classList.contains('revealed')) {
-        const textEl = document.getElementById(`ff-tile-text-${i}`);
-        const ptsEl  = document.getElementById(`ff-tile-pts-${i}`);
-        if (textEl) textEl.textContent = ans.t;
-        if (ptsEl)  ptsEl.textContent  = ans.p;
-        tile.classList.add('revealed');
-      }
-    });
-  }
+document.getElementById('btn-play').addEventListener('click', () => socket.emit('choose-play-or-pass', { choice: 'play' }));
+document.getElementById('btn-pass').addEventListener('click', () => socket.emit('choose-play-or-pass', { choice: 'pass' }));
 
-  if (stealSuccess) {
-    Sounds.pointAwarded();
-  } else if (stealFailed) {
-    Sounds.noPoint();
+socket.on('team-play-start', ({ controllingTeamIndex: c, teamName, teamColor, choice }) => {
+  Sounds.go();
+  controllingTeamIndex = c;
+  renderStrikes(0);
+  setPhase('team-play');
+  setStatus(
+    `<strong>${escapeHtml(teamName)}</strong> is playing the board`,
+    choice === 'pass'
+      ? 'They were passed the board. Ask each player in turn.'
+      : 'Ask each player in turn — 3 strikes and the other team can steal.',
+    teamColor
+  );
+});
+
+socket.on('answer-revealed', ({ answerIndex, text, pts, pot: newPot, teamIndex, context }) => {
+  Sounds.pointAwarded();
+  revealedIndices.push(answerIndex);
+  revealedBy[answerIndex] = teamIndex;
+  flipTile(answerIndex, text, pts);
+  setPot(newPot);
+  if (context === 'cleanup') {
+    updateRoundOverTile(answerIndex, text, pts);
   } else {
-    Sounds.pointAwarded();
+    markKeyRevealed(answerIndex, teamIndex);
   }
-
-  // Build round-over screen after a short delay so tiles can flip
-  setTimeout(() => {
-    buildRoundOverScreen(scores, pot, winnerTeamName, winnerTeamColor, allAnswers, stealSuccess, stealFailed);
-    showScreen('screen-round-over');
-  }, 1500);
 });
 
-function buildRoundOverScreen(scores, pot, winnerTeamName, winnerTeamColor, allAnswers, stealSuccess, stealFailed) {
-  const badge = document.getElementById('ro-winner-badge');
-  const isGold = winnerTeamColor === '#FFD60A';
-  badge.textContent = winnerTeamName;
-  badge.style.cssText = `background:${winnerTeamColor};color:${isGold ? '#111' : '#fff'}`;
-
-  const pointsEl = document.getElementById('ro-points-gained');
-  if (stealSuccess) {
-    pointsEl.textContent = `Steal successful! ${winnerTeamName} wins ${pot} points`;
-  } else if (stealFailed) {
-    pointsEl.textContent = `Steal failed. ${winnerTeamName} keeps ${pot} points`;
-  } else {
-    pointsEl.textContent = `${winnerTeamName} wins ${pot} points this round`;
-  }
-
-  const roBoard = document.getElementById('ro-reveal-board');
-  roBoard.innerHTML = '';
-  if (allAnswers) {
-    allAnswers.forEach(ans => {
-      const tile = document.createElement('div');
-      tile.className = 'ff-ro-tile';
-      tile.innerHTML = `
-        <span class="ff-ro-tile-text">${ans.t}</span>
-        <span class="ff-ro-tile-pts">${ans.p}</span>
-      `;
-      roBoard.appendChild(tile);
-    });
-  }
-
-  renderScoreCards('ro-scores', scores);
-}
-
-// ── Game over ──────────────────────────────────────────────────
-socket.on('game-over', ({ scores }) => {
-  Sounds.gameOver();
-  renderLeaderboard('final-leaderboard', scores);
-  showScreen('screen-game-over');
+socket.on('wrong-answer', ({ strikes }) => {
+  Sounds.noPoint();
+  renderStrikes(strikes);
 });
 
-// ── Host control buttons ───────────────────────────────────────
-document.getElementById('btn-wrong').addEventListener('click', () => {
-  socket.emit('host-wrong');
+socket.on('faceoff-miss', () => {
+  Sounds.noPoint();
 });
 
+socket.on('steal-mode', ({ stealTeamIndex: st, stealTeamName, stealTeamColor, pot: p }) => {
+  Sounds.timeUp();
+  stealTeamIndex = st;
+  setPot(p);
+  setPhase('steal');
+  setStatus(
+    `🚨 <strong>${escapeHtml(stealTeamName)}</strong> can STEAL ${p} points`,
+    'They confer and give ONE answer. Right = they take the pot. Wrong = the other team keeps it.',
+    '#FF9500'
+  );
+});
+
+document.getElementById('btn-wrong').addEventListener('click', () => socket.emit('host-wrong'));
 document.getElementById('btn-end-round').addEventListener('click', () => {
-  if (confirm('End this round? The active team gets all points revealed so far.')) {
-    socket.emit('end-round');
-  }
+  const scrapped = ['faceoff', 'faceoff-judging', 'faceoff-counter'].includes(phase);
+  const msg = scrapped
+    ? 'End this round now? No points will be awarded — the round is scrapped.'
+    : 'End this round now? The playing team banks the current pot.';
+  if (confirm(msg)) socket.emit('end-round');
 });
-
 document.getElementById('btn-end-game-game').addEventListener('click', () => {
   if (confirm('End the game now?')) socket.emit('end-game');
 });
 
-document.getElementById('btn-next-question').addEventListener('click', () => {
-  socket.emit('start-question');
+// ── Round over ─────────────────────────────────────────────────
+socket.on('round-complete', (rc) => {
+  if (rc.winnerTeamIndex != null) Sounds.pointAwarded(); else Sounds.noPoint();
+  currentScores = rc.scores;
+  setPhase('round-over');
+
+  const badge = document.getElementById('ro-winner-badge');
+  if (rc.winnerTeamIndex != null) {
+    const isGold = rc.winnerTeamColor === '#FFD60A';
+    badge.textContent = rc.winnerTeamName;
+    badge.style.cssText = `background:${rc.winnerTeamColor};color:${isGold ? '#111' : '#fff'}`;
+  } else {
+    badge.textContent = 'No winner';
+    badge.style.cssText = 'background:rgba(255,255,255,0.1);color:#fff';
+  }
+
+  const reasons = {
+    'board-clear':  `Cleared the whole board — ${rc.pot} points banked!`,
+    'steal':        `STOLEN! ${rc.winnerTeamName} takes all ${rc.pot} points`,
+    'steal-failed': `Steal failed — ${rc.winnerTeamName} keeps ${rc.pot} points`,
+    'host-ended':   rc.winnerTeamIndex != null
+      ? `Round ended — ${rc.winnerTeamName} banks ${rc.pot} points`
+      : 'Round scrapped — no points awarded'
+  };
+  document.getElementById('ro-points-gained').textContent = reasons[rc.reason] || `${rc.pot} points`;
+
+  renderRoundOverBoard(rc.revealed || [], rc.answerCount);
+  renderScoreCards('ro-scores', rc.scores);
+  showScreen('screen-round-over');
 });
 
+// Revealed answers show; the rest get a Show button so the host can flip
+// them for the room ("let's see what else was up there").
+function renderRoundOverBoard(revealed, count) {
+  const board = document.getElementById('ro-reveal-board');
+  board.innerHTML = '';
+  const byIndex = new Map(revealed.map(r => [r.index, r]));
+  for (let i = 0; i < (count || answerCount); i++) {
+    const r = byIndex.get(i);
+    const tile = document.createElement('div');
+    tile.id = `ro-tile-${i}`;
+    if (r) {
+      tile.className = 'ff-ro-tile';
+      tile.innerHTML = `<span class="ff-ro-tile-text">${escapeHtml(r.text)}</span><span class="ff-ro-tile-pts">${r.pts}</span>`;
+    } else {
+      // Host still sees the answer text (they always do) — the Show button
+      // is what reveals it on everyone else's screen.
+      tile.className = 'ff-ro-tile hidden-tile';
+      tile.innerHTML = `
+        <span class="ff-ro-tile-text">${escapeHtml(answers[i] ? answers[i].t : '???')}</span>
+        <button class="btn-ro-show" id="ro-show-${i}">Show</button>
+      `;
+      const btn = tile.querySelector(`#ro-show-${i}`);
+      if (btn) btn.addEventListener('click', () => socket.emit('reveal-answer', { answerIndex: i }));
+    }
+    board.appendChild(tile);
+  }
+}
+
+function updateRoundOverTile(index, text, pts) {
+  const tile = document.getElementById(`ro-tile-${index}`);
+  if (!tile) return;
+  tile.className = 'ff-ro-tile';
+  tile.innerHTML = `<span class="ff-ro-tile-text">${escapeHtml(text)}</span><span class="ff-ro-tile-pts">${pts}</span>`;
+}
+
+document.getElementById('btn-next-question').addEventListener('click', () => socket.emit('start-question'));
 document.getElementById('btn-end-game-roundover').addEventListener('click', () => {
   if (confirm('End the game now?')) socket.emit('end-game');
 });
 
-// ── Helpers ───────────────────────────────────────────────────
+// ── Game over ──────────────────────────────────────────────────
+socket.on('game-over', ({ scores }) => {
+  Sounds.gameOver();
+  setPhase('game-over');
+  renderLeaderboard('final-leaderboard', scores);
+  showScreen('screen-game-over');
+});
+
+// ── Helpers ────────────────────────────────────────────────────
 function renderScoreCards(containerId, scores) {
   const container = document.getElementById(containerId);
-  if (!container) return;
+  if (!container || !scores) return;
   container.innerHTML = '';
   scores.forEach(s => {
     const isGold = s.color === '#FFD60A';
     const card = document.createElement('div');
     card.className = 'score-card';
     card.style.cssText = `background:${s.color};color:${isGold ? '#111' : '#fff'}`;
-    card.innerHTML = `<div class="team-name">${s.name}</div><div class="score-num">${s.score}</div>`;
+    card.innerHTML = `<div class="team-name">${escapeHtml(s.name)}</div><div class="score-num">${s.score}</div>`;
     container.appendChild(card);
   });
 }
 
 function renderLeaderboard(containerId, scores) {
   const container = document.getElementById(containerId);
-  if (!container) return;
+  if (!container || !scores) return;
   container.innerHTML = '';
   [...scores].sort((a, b) => b.score - a.score).forEach((s, i) => {
     const isWinner = i === 0;
@@ -445,7 +531,7 @@ function renderLeaderboard(containerId, scores) {
     if (isWinner) row.style.cssText = `background:${s.color}22;border-color:${s.color}`;
     row.innerHTML = `
       <div class="lb-rank">${isWinner ? '👑' : i + 1}</div>
-      <div class="lb-name" style="color:${s.color}">${s.name}</div>
+      <div class="lb-name" style="color:${s.color}">${escapeHtml(s.name)}</div>
       <div class="lb-score">${s.score}</div>
     `;
     container.appendChild(row);
