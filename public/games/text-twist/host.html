@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text Twist — Host</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .back-link { display: inline-flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.4); font-size: 0.85rem; font-weight: 700; text-decoration: none; margin-bottom: 8px; }
+    .back-link:hover { color: rgba(255,255,255,0.7); }
+    .section-label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 10px; }
+
+    /* Setup selectors (same pattern as Grab the Mic) */
+    .opt-row { display: flex; gap: 8px; justify-content: center; }
+    .opt-btn {
+      flex: 1; padding: 10px 8px; border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.7); font-family: 'Fredoka', sans-serif;
+      font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+    }
+    .opt-btn:hover { background: rgba(255,255,255,0.15); }
+    .opt-btn.active { background: rgba(0,199,190,0.3); border-color: #00C7BE; color: #fff; }
+    .opt-btn small { display: block; font-size: 0.65rem; font-weight: 600; opacity: 0.6; }
+    .team-count-row { display: flex; align-items: center; gap: 16px; justify-content: center; margin-bottom: 16px; }
+    .count-btn { width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: #fff; font-size: 1.4rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .count-btn:hover { background: rgba(255,255,255,0.15); }
+    .count-num { font-family: 'Fredoka', sans-serif; font-size: 2.5rem; font-weight: 700; min-width: 48px; text-align: center; }
+
+    /* Lobby */
+    .lobby-code-section { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; }
+    .lobby-join-url { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; word-break: break-all; }
+    #screen-lobby { justify-content: flex-start; padding-top: 32px; }
+    .lobby-actions { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+
+    /* ── Round screen — this is the TV. NO WORD TEXT EVER APPEARS HERE. ── */
+    #screen-round { justify-content: flex-start; padding-top: 24px; }
+    .tt-inner { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 24px; align-items: center; }
+
+    .tt-timer-big {
+      font-family: 'Fredoka', sans-serif;
+      font-size: clamp(56px, 12vw, 96px);
+      font-weight: 700; line-height: 1; color: #34C759;
+      transition: color 0.3s;
+    }
+    .tt-timer-big.warning { color: #FF9500; }
+    .tt-timer-big.danger  { color: #FF2D55; animation: tt-pulse 0.6s ease-in-out infinite; }
+    @keyframes tt-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+    #tt-rack { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .tt-letter {
+      width: clamp(60px, 9vw, 92px); height: clamp(76px, 11vw, 116px);
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(180deg, #1e5c34, #16482a);
+      border: 2px solid rgba(255,255,255,0.2); border-radius: 16px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: clamp(34px, 6vw, 58px); font-weight: 700;
+      color: #FFD60A; text-transform: uppercase;
+      box-shadow: 0 5px 0 rgba(0,0,0,0.4);
+    }
+
+    .tt-meta { font-size: 0.9rem; color: var(--text-muted); font-weight: 700; }
+
+    /* Team progress — counts and bars only */
+    #tt-progress { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 10px; }
+    .tt-prog-row { display: flex; align-items: center; gap: 12px; }
+    .tt-prog-name { width: 110px; flex-shrink: 0; text-align: left; font-weight: 800; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tt-prog-bar { flex: 1; height: 22px; background: rgba(255,255,255,0.08); border-radius: 11px; overflow: hidden; }
+    .tt-prog-fill { height: 100%; border-radius: 11px; transition: width 0.4s ease-out; }
+    .tt-prog-count { width: 62px; flex-shrink: 0; text-align: right; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 0.95rem; color: rgba(255,255,255,0.75); }
+    .tt-prog-pts { width: 76px; flex-shrink: 0; text-align: right; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 1.3rem; }
+
+    .host-action-row { display: flex; gap: 10px; justify-content: center; width: 100%; max-width: 520px; }
+
+    /* Round over — the reveal */
+    #screen-round-over { justify-content: flex-start; padding-top: 24px; }
+    .ro-inner { width: 100%; max-width: 900px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .ro-topword {
+      font-family: 'Fredoka', sans-serif; font-size: clamp(28px, 5vw, 44px); font-weight: 700;
+      color: #FFD60A; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .ro-len-group { width: 100%; }
+    .ro-len-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.35); margin-bottom: 6px; text-align: left; }
+    .ro-words { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ro-word {
+      display: inline-flex; align-items: center; gap: 6px;
+      border-radius: 9px; padding: 5px 10px;
+      font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.4);
+    }
+    .ro-word.found { background: rgba(30,92,52,0.4); border-color: rgba(52,199,89,0.5); color: #fff; }
+    .ro-word.top { border-color: #FFD60A; }
+    .ro-word .pts { font-family: 'Fredoka', sans-serif; font-size: 0.78rem; color: #FFD60A; }
+    .ro-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .ro-nobody { font-size: 0.62rem; font-weight: 800; color: rgba(255,255,255,0.3); letter-spacing: 0.05em; }
+
+    #screen-game-over { justify-content: flex-start; padding-top: 32px; }
+  </style>
+</head>
+<body>
+
+  <!-- SETUP -->
+  <div id="screen-setup" class="screen active col center gap-24">
+    <div class="col center gap-8">
+      <a href="/" class="back-link">← Games Night</a>
+      <span style="font-size:3rem">🔤</span>
+      <h1 class="heading" style="font-size:2.2rem">Text Twist</h1>
+      <p style="color:var(--text-muted);font-size:0.95rem">A jumble of letters. Race to build the most words.</p>
+    </div>
+    <div class="card col gap-16">
+      <div>
+        <div class="section-label">Game Mode</div>
+        <div class="opt-row" id="mode-selector">
+          <button class="opt-btn active" data-mode="teams">Teams</button>
+          <button class="opt-btn" data-mode="individual">Individuals</button>
+        </div>
+      </div>
+      <div id="teams-setup" class="col gap-16">
+        <div>
+          <div class="section-label">Number of Teams</div>
+          <div class="team-count-row">
+            <button class="count-btn" id="count-down">−</button>
+            <div class="count-num" id="team-count-display">2</div>
+            <button class="count-btn" id="count-up">+</button>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">Team Names</div>
+          <div id="team-name-inputs" class="col gap-8"></div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Difficulty</div>
+        <div class="opt-row" id="difficulty-selector">
+          <button class="opt-btn" data-difficulty="easy">Easy<small>5 letters</small></button>
+          <button class="opt-btn active" data-difficulty="medium">Medium<small>7 letters</small></button>
+          <button class="opt-btn" data-difficulty="hard">Hard<small>8–10 letters</small></button>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Round Timer</div>
+        <div class="opt-row" id="timer-selector">
+          <button class="opt-btn" data-seconds="60">1:00</button>
+          <button class="opt-btn" data-seconds="90">1:30</button>
+          <button class="opt-btn active" data-seconds="120">2:00</button>
+          <button class="opt-btn" data-seconds="180">3:00</button>
+        </div>
+      </div>
+      <button class="btn btn-reveal mt-8" id="btn-create">Create Room</button>
+      <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
+    </div>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="screen-lobby" class="screen col center gap-16">
+    <div class="lobby-code-section">
+      <div style="text-align:center">
+        <div class="section-label">Room Code</div>
+        <div class="room-code" id="lobby-room-code">----</div>
+        <div class="lobby-join-url" id="lobby-join-url"></div>
+        <div id="lobby-player-address" style="font-size:0.85rem;color:#34C759;font-weight:700;margin-top:6px;background:rgba(52,199,89,0.12);border-radius:8px;padding:6px 12px"></div>
+      </div>
+      <div class="qr-wrap" id="lobby-qr" style="display:none">
+        <img id="lobby-qr-img" width="160" height="160" alt="QR Code">
+      </div>
+    </div>
+
+    <div id="lobby-scores-section" style="display:none;width:100%;max-width:520px">
+      <div class="section-label mb-8">Scores</div>
+      <div class="score-grid" id="lobby-scores"></div>
+    </div>
+
+    <div style="width:100%;max-width:520px">
+      <div class="section-label mb-8">Players (<span id="player-count">0</span>)</div>
+      <div class="player-groups" id="player-groups"></div>
+    </div>
+
+    <div class="lobby-actions">
+      <div class="section-label" style="text-align:center">Next Round Difficulty</div>
+      <div class="opt-row" id="lobby-difficulty">
+        <button class="opt-btn" data-difficulty="easy">Easy</button>
+        <button class="opt-btn active" data-difficulty="medium">Medium</button>
+        <button class="opt-btn" data-difficulty="hard">Hard</button>
+      </div>
+      <button class="btn btn-reveal" id="btn-start-round">Start Round</button>
+      <button class="btn btn-ghost" id="btn-end-game-lobby" style="display:none">End Game</button>
+    </div>
+  </div>
+
+  <!-- ROUND (the TV — letters, clock, and counts only) -->
+  <div id="screen-round" class="screen col center gap-0">
+    <div class="tt-inner">
+      <div class="tt-timer-big" id="tt-timer">2:00</div>
+      <div id="tt-rack"></div>
+      <div class="tt-meta" id="tt-meta"></div>
+      <div id="tt-progress"></div>
+      <div class="host-action-row">
+        <button class="btn btn-ghost" id="btn-end-round">End Round Early</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROUND OVER (the reveal) -->
+  <div id="screen-round-over" class="screen col center gap-0">
+    <div class="ro-inner">
+      <div id="ro-headline" style="font-family:'Fredoka',sans-serif;font-size:1.4rem;font-weight:700"></div>
+      <div>
+        <div class="section-label" style="text-align:center;margin-bottom:2px">The Top Word</div>
+        <div class="ro-topword" id="ro-topword"></div>
+      </div>
+      <div class="score-grid" id="ro-scores" style="max-width:640px"></div>
+      <div style="width:100%">
+        <div class="section-label mb-8" style="text-align:left">Every word in the jumble</div>
+        <div id="ro-groups" class="col gap-12"></div>
+      </div>
+      <div class="lobby-actions">
+        <div class="section-label" style="text-align:center">Next Round Difficulty</div>
+        <div class="opt-row" id="ro-difficulty">
+          <button class="opt-btn" data-difficulty="easy">Easy</button>
+          <button class="opt-btn active" data-difficulty="medium">Medium</button>
+          <button class="opt-btn" data-difficulty="hard">Hard</button>
+        </div>
+        <button class="btn btn-reveal" id="btn-next-round">Next Round</button>
+        <button class="btn btn-ghost" id="btn-end-game">End Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-20">
+    <div style="font-size:3rem">🏆</div>
+    <h2 class="heading" style="font-size:2rem">Final Scores</h2>
+    <div class="leaderboard" id="final-leaderboard"></div>
+    <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/text-twist/js/sounds.js"></script>
+  <script src="/games/text-twist/js/host.js"></script>
+</body>
+</html>

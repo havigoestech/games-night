@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Text Twist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .join-logo { font-family: 'Fredoka', sans-serif; font-size: 2rem; font-weight: 700; margin-bottom: 4px; }
+    .team-btn { width: 100%; padding: 16px 20px; border-radius: 16px; border: 2px solid transparent; font-family: 'Fredoka', sans-serif; font-size: 1.2rem; font-weight: 700; cursor: pointer; color: #fff; transition: transform 0.1s; text-align: center; }
+    .team-btn:active { transform: scale(0.97); }
+    .team-btn.dark-text { color: #111 !important; }
+
+    .waiting-team-badge { font-family: 'Fredoka', sans-serif; font-size: 1.4rem; font-weight: 700; padding: 10px 24px; border-radius: 14px; letter-spacing: 0.03em; }
+    .waiting-label { font-size: 1.1rem; color: rgba(255,255,255,0.7); font-weight: 600; margin-top: 8px; }
+    #screen-waiting { transition: background 0.5s; }
+
+    /* ── Round screen ── */
+    #screen-round { justify-content: flex-start; padding-top: 12px; overflow-y: auto; }
+    .tt-inner { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+
+    .tt-topbar { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 10px; }
+    .tt-timer {
+      font-family: 'Fredoka', sans-serif; font-size: 2rem; font-weight: 700;
+      color: #34C759; min-width: 60px; text-align: left; transition: color 0.3s;
+    }
+    .tt-timer.warning { color: #FF9500; }
+    .tt-timer.danger  { color: #FF2D55; animation: tt-pulse 0.6s ease-in-out infinite; }
+    @keyframes tt-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+    .tt-team-pts {
+      font-family: 'Fredoka', sans-serif; font-size: 1rem; font-weight: 700;
+      padding: 6px 14px; border-radius: 20px; text-align: right;
+    }
+
+    /* Letter rack */
+    #tt-rack { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; width: 100%; }
+    .tt-letter {
+      width: 42px; height: 52px;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(180deg, #1e5c34, #16482a);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      font-family: 'Fredoka', sans-serif; font-size: 1.6rem; font-weight: 700;
+      color: #FFD60A; text-transform: uppercase;
+      box-shadow: 0 2px 0 rgba(0,0,0,0.35);
+    }
+
+    /* Input */
+    .tt-input-row { display: flex; gap: 8px; width: 100%; }
+    #tt-input {
+      flex: 1;
+      font-family: 'Fredoka', sans-serif !important;
+      font-size: 1.4rem !important;
+      letter-spacing: 0.14em !important;
+      text-align: center !important;
+      text-transform: uppercase;
+      padding: 14px !important;
+    }
+    #tt-input:disabled { opacity: 0.5; }
+    .tt-input-row.bad #tt-input { border-color: #FF2D55; animation: tt-shake 0.35s; }
+    @keyframes tt-shake {
+      0%,100% { transform: translateX(0); }
+      25% { transform: translateX(-7px); } 75% { transform: translateX(7px); }
+    }
+    .btn-twist {
+      flex-shrink: 0; width: 58px; padding: 0;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08);
+      border-radius: 12px; color: #fff; font-size: 1.4rem; cursor: pointer;
+    }
+    .btn-twist:active { transform: rotate(180deg); transition: transform 0.3s; }
+
+    #tt-feedback {
+      min-height: 1.4em; font-weight: 700; font-size: 0.95rem; text-align: center;
+    }
+    #tt-feedback.good { color: #34C759; }
+    #tt-feedback.bad  { color: #FF2D55; }
+    #tt-feedback.warn { color: #FF9500; }
+
+    /* Progress buckets — direction without giving away answers */
+    #tt-buckets { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+    .tt-bucket { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; font-weight: 700; }
+    .tt-bucket-label { color: rgba(255,255,255,0.5); width: 62px; flex-shrink: 0; text-align: left; }
+    .tt-bucket-slots { display: flex; gap: 3px; flex: 1; flex-wrap: wrap; }
+    .tt-slot { width: 12px; height: 12px; border-radius: 3px; background: rgba(255,255,255,0.12); }
+    .tt-slot.got { background: #34C759; }
+    .tt-bucket-count { color: rgba(255,255,255,0.5); width: 34px; flex-shrink: 0; text-align: right; }
+    .tt-bucket.top .tt-bucket-label { color: #FFD60A; }
+    .tt-bucket.top .tt-slot.got { background: #FFD60A; }
+
+    /* Shared team word list */
+    .tt-section-label {
+      font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.4); text-align: center; width: 100%;
+    }
+    #tt-words { width: 100%; display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+    .tt-word {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(52,199,89,0.16); border: 1px solid rgba(52,199,89,0.4);
+      border-radius: 8px; padding: 4px 9px;
+      font-size: 0.8rem; font-weight: 700; color: #fff;
+      animation: tt-pop 0.3s ease-out;
+    }
+    .tt-word.top { background: rgba(255,214,10,0.2); border-color: #FFD60A; }
+    .tt-word .w { text-transform: uppercase; letter-spacing: 0.04em; }
+    .tt-word .by { font-size: 0.62rem; font-weight: 600; color: rgba(255,255,255,0.5); }
+    .tt-word .pts { font-family: 'Fredoka', sans-serif; font-size: 0.75rem; color: #34C759; }
+    .tt-word.top .pts { color: #FFD60A; }
+    @keyframes tt-pop { 0% { transform: scale(0.7); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+    /* Round over */
+    #screen-round-over { justify-content: flex-start; padding-top: 20px; overflow-y: auto; }
+    .ro-inner { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .ro-badge { font-family: 'Fredoka', sans-serif; font-size: 1.3rem; font-weight: 700; padding: 12px 24px; border-radius: 16px; text-align: center; }
+    #ro-words { width: 100%; display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+    .ro-word {
+      border-radius: 8px; padding: 4px 9px; font-size: 0.78rem; font-weight: 700;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .ro-word.mine  { background: rgba(52,199,89,0.2); border-color: #34C759; color: #fff; }
+    .ro-word.top   { border-color: #FFD60A; color: #FFD60A; }
+    .ro-word.missed { text-decoration: none; }
+
+    #screen-game-over { justify-content: flex-start; padding-top: 40px; }
+    #screen-host-disconnected { position: fixed; inset: 0; background: var(--bg); z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+    #screen-host-disconnected.active { display: flex; }
+  </style>
+</head>
+<body>
+
+  <!-- JOIN -->
+  <div id="screen-join" class="screen active col center gap-20">
+    <div class="col center gap-4">
+      <span style="font-size:2.5rem">🔤</span>
+      <div class="join-logo">Text Twist</div>
+    </div>
+    <div class="card col gap-12" style="max-width:360px">
+      <div>
+        <div class="tt-section-label" style="text-align:left;margin-bottom:6px">Your Name</div>
+        <input type="text" id="input-name" placeholder="Enter your name" maxlength="20" autocomplete="off">
+      </div>
+      <div>
+        <div class="tt-section-label" style="text-align:left;margin-bottom:6px">Room Code</div>
+        <input type="text" id="input-room" class="room-code-input" placeholder="ABCD" maxlength="4" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="error-msg" id="join-error"></div>
+      <button class="btn btn-primary mt-8" id="btn-join">Join Game</button>
+    </div>
+  </div>
+
+  <!-- TEAM SELECT -->
+  <div id="screen-team-select" class="screen col center gap-16">
+    <div class="col center gap-4">
+      <h2 class="heading" style="font-size:1.8rem">Pick Your Team</h2>
+      <p style="color:var(--text-muted);font-size:0.9rem;font-weight:600">You'll hunt for words together</p>
+    </div>
+    <div id="team-buttons" class="col gap-12" style="width:100%;max-width:360px"></div>
+  </div>
+
+  <!-- WAITING -->
+  <div id="screen-waiting" class="screen col center gap-16">
+    <div class="waiting-team-badge" id="waiting-team-badge">Team</div>
+    <div class="waiting-label" id="waiting-label">Waiting for the next jumble...</div>
+    <div style="margin-top:8px;width:100%;max-width:360px">
+      <div class="tt-section-label" style="margin-bottom:8px">Scores</div>
+      <div class="score-grid" id="waiting-scores"></div>
+    </div>
+  </div>
+
+  <!-- ROUND -->
+  <div id="screen-round" class="screen col center gap-0">
+    <div class="tt-inner">
+      <div class="tt-topbar">
+        <div class="tt-timer" id="tt-timer">--</div>
+        <div class="tt-team-pts" id="tt-team-pts">0 pts</div>
+      </div>
+
+      <div id="tt-rack"></div>
+
+      <div class="tt-input-row" id="tt-input-row">
+        <input type="text" id="tt-input" placeholder="TYPE A WORD"
+               autocomplete="off" autocorrect="off" autocapitalize="off"
+               spellcheck="false" enterkeyhint="go" maxlength="10">
+        <button class="btn-twist" id="btn-twist" title="Shuffle the letters">🔀</button>
+      </div>
+      <div id="tt-feedback"></div>
+
+      <div id="tt-buckets"></div>
+
+      <div class="tt-section-label" id="tt-words-label">Your team's words</div>
+      <div id="tt-words"></div>
+    </div>
+  </div>
+
+  <!-- ROUND OVER -->
+  <div id="screen-round-over" class="screen col center gap-0">
+    <div class="ro-inner">
+      <div style="font-size:1.8rem" id="ro-emoji">⏰</div>
+      <div class="ro-badge" id="ro-badge"></div>
+      <div id="ro-sub" style="font-size:0.9rem;color:rgba(255,255,255,0.65);font-weight:600;text-align:center"></div>
+      <div style="width:100%">
+        <div class="tt-section-label" style="margin-bottom:8px">Every word in the jumble</div>
+        <div id="ro-words"></div>
+        <div id="ro-legend" style="font-size:0.68rem;color:rgba(255,255,255,0.35);font-weight:600;text-align:center;margin-top:8px">
+          Green = your team got it · Grey = nobody on your team found it
+        </div>
+      </div>
+      <div style="width:100%">
+        <div class="tt-section-label" style="margin-bottom:8px">Scores</div>
+        <div class="score-grid" id="ro-scores"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-20">
+    <div style="font-size:3rem">🏆</div>
+    <h2 class="heading" style="font-size:2rem">Game Over!</h2>
+    <div class="leaderboard" id="final-leaderboard"></div>
+    <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <!-- HOST DISCONNECTED -->
+  <div id="screen-host-disconnected">
+    <span style="font-size:3rem">😴</span>
+    <h2 class="heading" style="font-size:1.8rem">Host Disconnected</h2>
+    <p style="color:var(--text-muted);font-weight:600">The host has left the game.</p>
+    <button class="btn btn-ghost" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/text-twist/js/sounds.js"></script>
+  <script src="/games/text-twist/js/player.js"></script>
+</body>
+</html>
