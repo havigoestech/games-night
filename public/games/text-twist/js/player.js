@@ -181,6 +181,8 @@ function applySnapshot(s) {
       renderBuckets(s.buckets || []);
       renderWords(s.myWords || []);
       setTeamPoints((s.myWords || []).reduce((sum, w) => sum + w.pts, 0));
+      myRank = 0;
+      renderRank(s.progress);
       unlockInput();
       setFeedback('');
       showScreen('screen-round');
@@ -249,8 +251,45 @@ socket.on('timer', ({ secondsLeft }) => {
   renderTimer(secondsLeft);
 });
 
+// ── Live standing ─────────────────────────────────────────────
+// team-progress carries counts and points for everyone (never word text), so
+// each phone can work out where it currently sits.
+let myRank = 0;
+
+const ORDINAL = n => {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+
+function renderRank(progress) {
+  const el = document.getElementById('tt-rank');
+  if (!el || !progress || !progress.length) return;
+
+  const ranked = [...progress].sort((a, b) =>
+    b.points - a.points || b.wordCount - a.wordCount || a.teamIndex - b.teamIndex);
+  const pos = ranked.findIndex(p => p.teamIndex === myTeamIndex) + 1;
+  if (!pos) return;
+
+  const scoring = ranked.some(p => p.points > 0);
+  el.textContent = scoring
+    ? `${pos === 1 ? '👑 ' : ''}${ORDINAL(pos)} of ${ranked.length}`
+    : `${ranked.length} ${roomMode === 'individual' ? 'players' : 'teams'}`;
+  el.classList.toggle('first', scoring && pos === 1);
+
+  // Pulse whenever we move up — that's the moment worth noticing.
+  if (myRank && pos < myRank) {
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+  }
+  myRank = pos;
+}
+
+socket.on('team-progress', ({ progress }) => renderRank(progress));
+
 // ── Round start ───────────────────────────────────────────────
-socket.on('round-start', ({ letters: L, secondsLeft, buckets, scores }) => {
+socket.on('round-start', ({ letters: L, secondsLeft, buckets, scores, progress }) => {
   Sounds.wordReveal();
   letters = L;
   renderRack(letters);
@@ -260,6 +299,8 @@ socket.on('round-start', ({ letters: L, secondsLeft, buckets, scores }) => {
   setTeamPoints(0);
   setFeedback('');
   unlockInput();
+  myRank = 0;
+  renderRank(progress);
   renderScoreCards('waiting-scores', scores);
   showScreen('screen-round');
   document.getElementById('tt-input').focus();

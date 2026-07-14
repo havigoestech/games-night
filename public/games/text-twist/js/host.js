@@ -202,6 +202,7 @@ socket.on('round-start', (d) => {
   renderTimer(d.secondsLeft);
   document.getElementById('tt-meta').textContent =
     `Round ${d.round} · ${d.difficulty.toUpperCase()} · ${d.totalWords} words hidden in these letters`;
+  progKey = '';                 // fresh rows — don't animate out of last round's order
   renderProgress(d.progress);
   showScreen('screen-round');
 });
@@ -235,22 +236,88 @@ socket.on('timer', ({ secondsLeft }) => {
 // carry word text or the teams would just copy each other.
 socket.on('team-progress', ({ progress }) => renderProgress(progress));
 
-function renderProgress(progress) {
+// Rows are created once and then kept — re-sorting reuses the same elements so
+// they can be animated between positions. Rebuilding the list every tick (the
+// obvious approach) would make overtakes teleport instead of glide.
+let progRows = new Map();
+let progKey = '';
+
+function buildProgressRows(progress) {
   const container = document.getElementById('tt-progress');
   container.innerHTML = '';
-  (progress || []).forEach(p => {
+  progRows = new Map();
+  progress.forEach(p => {
     const team = currentScores[p.teamIndex];
     if (!team) return;
-    const pct = p.total ? Math.round((p.wordCount / p.total) * 100) : 0;
     const row = document.createElement('div');
     row.className = 'tt-prog-row';
     row.innerHTML = `
+      <div class="tt-prog-rank">–</div>
       <div class="tt-prog-name" style="color:${team.color}">${escapeHtml(team.name)}</div>
-      <div class="tt-prog-bar"><div class="tt-prog-fill" style="width:${pct}%;background:${team.color}"></div></div>
-      <div class="tt-prog-count">${p.wordCount}/${p.total}</div>
-      <div class="tt-prog-pts" style="color:${team.color}">${p.points}</div>
+      <div class="tt-prog-bar"><div class="tt-prog-fill" style="width:0%;background:${team.color}"></div></div>
+      <div class="tt-prog-count">0/${p.total}</div>
+      <div class="tt-prog-pts" style="color:${team.color}">0</div>
     `;
     container.appendChild(row);
+    progRows.set(p.teamIndex, row);
+  });
+}
+
+function renderProgress(progress) {
+  const container = document.getElementById('tt-progress');
+  if (!container || !progress || !progress.length) return;
+
+  // Roster changed (e.g. a latecomer joined an individuals game) → start fresh.
+  const key = progress.map(p => p.teamIndex).join(',');
+  if (key !== progKey) {
+    progKey = key;
+    buildProgressRows(progress);
+  }
+
+  // FIRST — where does every row sit right now?
+  const before = new Map();
+  progRows.forEach((row, ti) => before.set(ti, row.getBoundingClientRect().top));
+
+  // Update each row's numbers in place.
+  progress.forEach(p => {
+    const row = progRows.get(p.teamIndex);
+    if (!row) return;
+    const pct = p.total ? Math.round((p.wordCount / p.total) * 100) : 0;
+    row.querySelector('.tt-prog-fill').style.width = pct + '%';
+    row.querySelector('.tt-prog-count').textContent = `${p.wordCount}/${p.total}`;
+    row.querySelector('.tt-prog-pts').textContent = p.points;
+  });
+
+  // Points decide the winner, so points decide the order. Word count breaks ties.
+  const ranked = [...progress].sort((a, b) =>
+    b.points - a.points || b.wordCount - a.wordCount || a.teamIndex - b.teamIndex);
+
+  // LAST — re-append in rank order, which moves the rows.
+  const scoring = ranked.some(p => p.points > 0);
+  ranked.forEach((p, i) => {
+    const row = progRows.get(p.teamIndex);
+    if (!row) return;
+    row.querySelector('.tt-prog-rank').textContent = scoring ? (i + 1) : '–';
+    row.classList.toggle('leader', scoring && i === 0);
+    container.appendChild(row);
+  });
+
+  // INVERT + PLAY — snap each row back to where it was, then let it slide to
+  // its new home. This is what you actually see as "overtaking".
+  progRows.forEach((row, ti) => {
+    const delta = before.get(ti) - row.getBoundingClientRect().top;
+    if (!delta) return;
+    row.style.transition = 'none';
+    row.style.transform = `translateY(${delta}px)`;
+    if (delta > 0) {                       // moved up the board — flash it
+      row.classList.remove('climbing');
+      void row.offsetWidth;
+      row.classList.add('climbing');
+    }
+    requestAnimationFrame(() => {
+      row.style.transition = 'transform 0.55s cubic-bezier(0.22, 1, 0.36, 1)';
+      row.style.transform = '';
+    });
   });
 }
 

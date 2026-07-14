@@ -21,7 +21,19 @@
     #screen-round { justify-content: flex-start; padding-top: 12px; overflow-y: auto; }
     .tt-inner { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 
-    .tt-topbar { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 10px; }
+    .tt-topbar { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
+    /* Live standing — so you can see yourself climb without looking up at the TV */
+    .tt-rank {
+      flex: 1;
+      font-family: 'Fredoka', sans-serif; font-size: 0.9rem; font-weight: 700;
+      text-align: center; color: rgba(255,255,255,0.55);
+      transition: color 0.3s, transform 0.3s;
+    }
+    .tt-rank.first { color: #FFD60A; }
+    .tt-rank.bump { animation: tt-bump 0.5s ease-out; }
+    @keyframes tt-bump {
+      0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); }
+    }
     .tt-timer {
       font-family: 'Fredoka', sans-serif; font-size: 2rem; font-weight: 700;
       color: #34C759; min-width: 60px; text-align: left; transition: color 0.3s;
@@ -175,6 +187,7 @@
     <div class="tt-inner">
       <div class="tt-topbar">
         <div class="tt-timer" id="tt-timer">--</div>
+        <div class="tt-rank" id="tt-rank"></div>
         <div class="tt-team-pts" id="tt-team-pts">0 pts</div>
       </div>
 

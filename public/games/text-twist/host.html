@@ -62,14 +62,44 @@
 
     .tt-meta { font-size: 0.9rem; color: var(--text-muted); font-weight: 700; }
 
-    /* Team progress — counts and bars only */
-    #tt-progress { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 10px; }
-    .tt-prog-row { display: flex; align-items: center; gap: 12px; }
-    .tt-prog-name { width: 110px; flex-shrink: 0; text-align: left; font-weight: 800; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .tt-prog-bar { flex: 1; height: 22px; background: rgba(255,255,255,0.08); border-radius: 11px; overflow: hidden; }
-    .tt-prog-fill { height: 100%; border-radius: 11px; transition: width 0.4s ease-out; }
-    .tt-prog-count { width: 62px; flex-shrink: 0; text-align: right; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 0.95rem; color: rgba(255,255,255,0.75); }
-    .tt-prog-pts { width: 76px; flex-shrink: 0; text-align: right; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 1.3rem; }
+    /* ── Live leaderboard — counts and bars only, never word text ──
+       Rows re-sort themselves as points come in, so the room watches teams
+       physically overtake each other. */
+    #tt-progress { width: 100%; max-width: 680px; display: flex; flex-direction: column; gap: 8px; }
+    .tt-prog-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 7px 12px; border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid transparent;
+      will-change: transform;
+    }
+    .tt-prog-row.leader {
+      background: rgba(255,214,10,0.09);
+      border-color: rgba(255,214,10,0.4);
+    }
+    /* Brief flash when a row climbs the board */
+    .tt-prog-row.climbing { animation: tt-climb 0.9s ease-out; }
+    @keyframes tt-climb {
+      0%   { background: rgba(255,255,255,0.22); }
+      100% { background: rgba(255,255,255,0.03); }
+    }
+    .tt-prog-row.leader.climbing { animation: tt-climb-gold 0.9s ease-out; }
+    @keyframes tt-climb-gold {
+      0%   { background: rgba(255,214,10,0.4); }
+      100% { background: rgba(255,214,10,0.09); }
+    }
+
+    .tt-prog-rank {
+      width: 26px; flex-shrink: 0; text-align: center;
+      font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 1.05rem;
+      color: rgba(255,255,255,0.35);
+    }
+    .tt-prog-row.leader .tt-prog-rank { color: #FFD60A; }
+    .tt-prog-name { width: 120px; flex-shrink: 0; text-align: left; font-weight: 800; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tt-prog-bar { flex: 1; height: 20px; background: rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; }
+    .tt-prog-fill { height: 100%; border-radius: 10px; width: 0; transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+    .tt-prog-count { width: 60px; flex-shrink: 0; text-align: right; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 0.9rem; color: rgba(255,255,255,0.6); }
+    .tt-prog-pts { width: 76px; flex-shrink: 0; text-align: right; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 1.35rem; }
 
     .host-action-row { display: flex; gap: 10px; justify-content: center; width: 100%; max-width: 520px; }
 
