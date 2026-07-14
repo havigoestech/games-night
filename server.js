@@ -28,6 +28,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 require('./games/grab-the-mic/game.js')(io.of('/grab-the-mic'), LOCAL_IP, PORT);
 require('./games/family-feud/game.js')(io.of('/family-feud'), LOCAL_IP, PORT);
 require('./games/text-twist/game.js')(io.of('/text-twist'), LOCAL_IP, PORT);
+require('./games/kill-and-injury/game.js')(io.of('/kill-and-injury'), LOCAL_IP, PORT);
 
 server.listen(PORT, () => {
   console.log('Games Night hub running at:');

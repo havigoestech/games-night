@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kill &amp; Injury — Host</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .back-link { display: inline-flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.4); font-size: 0.85rem; font-weight: 700; text-decoration: none; margin-bottom: 8px; }
+    .back-link:hover { color: rgba(255,255,255,0.7); }
+    .section-label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 10px; }
+
+    .opt-row { display: flex; gap: 8px; justify-content: center; }
+    .opt-btn {
+      flex: 1; padding: 10px 8px; border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.7); font-family: 'Fredoka', sans-serif;
+      font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+    }
+    .opt-btn:hover { background: rgba(255,255,255,0.15); }
+    .opt-btn.active { background: rgba(191,90,242,0.3); border-color: #BF5AF2; color: #fff; }
+    .opt-btn small { display: block; font-size: 0.65rem; font-weight: 600; opacity: 0.6; }
+
+    .lobby-code-section { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; }
+    .lobby-join-url { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; word-break: break-all; }
+    #screen-lobby, #screen-codes { justify-content: flex-start; padding-top: 32px; }
+    .lobby-actions { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+
+    /* Code-setting status — ticks only, NEVER the codes */
+    .ready-row { display: flex; gap: 16px; width: 100%; max-width: 640px; }
+    .ready-card {
+      flex: 1; border-radius: 18px; padding: 24px 16px; text-align: center;
+      border: 2px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04);
+      transition: all 0.35s;
+    }
+    .ready-card.ready { background: rgba(52,199,89,0.14); border-color: #34C759; }
+    .ready-card .nm { font-family: 'Fredoka', sans-serif; font-size: 1.5rem; font-weight: 700; }
+    .ready-card .st { font-size: 0.95rem; font-weight: 700; margin-top: 8px; color: rgba(255,255,255,0.45); }
+    .ready-card.ready .st { color: #34C759; }
+    .ready-card .dots { font-size: 2.4rem; margin-top: 6px; letter-spacing: 0.2em; color: rgba(255,255,255,0.25); }
+    .ready-card.ready .dots { color: #34C759; }
+
+    /* ── MATCH: the TV. Both boards, neither code. ── */
+    #screen-match { justify-content: flex-start; padding-top: 18px; }
+    .m-inner { width: 100%; max-width: 1000px; display: flex; flex-direction: column; gap: 14px; align-items: center; }
+    .m-timer {
+      font-family: 'Fredoka', sans-serif; font-size: clamp(48px, 9vw, 84px);
+      font-weight: 700; line-height: 1; color: #34C759; transition: color 0.3s;
+    }
+    .m-timer.warning { color: #FF9500; }
+    .m-timer.danger  { color: #FF2D55; animation: ki-pulse 0.6s ease-in-out infinite; }
+    @keyframes ki-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+    .m-round { font-family: 'Fredoka', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text-muted); }
+
+    #one-away {
+      display: none; width: 100%; max-width: 640px; text-align: center;
+      font-family: 'Fredoka', sans-serif; font-size: 1.5rem; font-weight: 700;
+      padding: 12px; border-radius: 14px;
+      background: rgba(255,149,0,0.2); border: 2px solid #FF9500; color: #FF9500;
+      animation: ki-flash 0.7s ease-in-out infinite;
+    }
+    #one-away.visible { display: block; }
+    @keyframes ki-flash { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+    .boards { display: flex; gap: 20px; width: 100%; }
+    .board { flex: 1; min-width: 0; }
+    .board-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-radius: 14px 14px 0 0;
+      border: 2px solid; border-bottom: none;
+    }
+    .board-name { font-family: 'Fredoka', sans-serif; font-size: 1.25rem; font-weight: 700; }
+    .board-lock {
+      font-size: 0.65rem; font-weight: 800; letter-spacing: 0.06em;
+      padding: 4px 10px; border-radius: 20px;
+      background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4);
+      transition: all 0.3s;
+    }
+    .board-lock.locked { background: #FF2D55; color: #fff; }
+    .board-body {
+      border: 2px solid; border-top: none; border-radius: 0 0 14px 14px;
+      padding: 10px; min-height: 200px;
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .brow {
+      display: grid; grid-template-columns: 28px 1fr auto auto;
+      align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.05); border-radius: 9px; padding: 8px 12px;
+      animation: ki-pop 0.35s ease-out;
+    }
+    @keyframes ki-pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .brow .n { font-family: 'Fredoka', sans-serif; font-size: 0.8rem; color: rgba(255,255,255,0.3); }
+    .brow .g { font-family: 'Fredoka', sans-serif; font-size: 1.5rem; font-weight: 700; letter-spacing: 0.18em; text-align: left; color: #fff; }
+    .brow .k, .brow .i {
+      font-family: 'Fredoka', sans-serif; font-size: 0.95rem; font-weight: 700;
+      padding: 3px 9px; border-radius: 8px; white-space: nowrap;
+    }
+    .brow .k { background: rgba(255,45,85,0.2); color: #FF2D55; }
+    .brow .i { background: rgba(255,149,0,0.2); color: #FF9500; }
+    .brow.forfeit { opacity: 0.35; }
+    .brow.forfeit .g { font-size: 0.9rem; letter-spacing: 0; color: rgba(255,255,255,0.5); }
+    .brow.close { background: rgba(255,149,0,0.18); border: 1px solid rgba(255,149,0,0.5); }
+    .brow.crack { background: rgba(52,199,89,0.28); border: 1px solid #34C759; }
+    .board-empty { color: rgba(255,255,255,0.2); font-weight: 700; text-align: center; padding: 30px 0; font-size: 0.9rem; }
+
+    /* Match over — the reveal */
+    #screen-over { justify-content: flex-start; padding-top: 26px; }
+    .o-inner { width: 100%; max-width: 900px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .reveal-row { display: flex; gap: 20px; width: 100%; max-width: 640px; }
+    .reveal-card { flex: 1; border-radius: 18px; padding: 18px; text-align: center; }
+    .reveal-card .lbl { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
+    .reveal-card .code {
+      font-family: 'Fredoka', sans-serif; font-size: clamp(36px, 6vw, 60px); font-weight: 700;
+      letter-spacing: 0.22em; padding-left: 0.22em; line-height: 1.15;
+    }
+    #screen-game-over { justify-content: flex-start; padding-top: 32px; }
+  </style>
+</head>
+<body>
+
+  <!-- SETUP -->
+  <div id="screen-setup" class="screen active col center gap-24">
+    <div class="col center gap-8">
+      <a href="/" class="back-link">← Games Night</a>
+      <span style="font-size:3rem">🕵️</span>
+      <h1 class="heading" style="font-size:2.2rem">Kill &amp; Injury</h1>
+      <p style="color:var(--text-muted);font-size:0.95rem">Two sides. Two secret codes. Crack theirs first.</p>
+    </div>
+    <div class="card col gap-16">
+      <div>
+        <div class="section-label">The Two Sides</div>
+        <div id="team-name-inputs" class="col gap-8"></div>
+        <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);font-weight:600;margin-top:6px;text-align:center">
+          Playing 1v1? Just name them after the two players.
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Code Length</div>
+        <div class="opt-row" id="len-selector">
+          <button class="opt-btn" data-len="3">3<small>easy</small></button>
+          <button class="opt-btn active" data-len="4">4<small>classic</small></button>
+          <button class="opt-btn" data-len="5">5<small>hard</small></button>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Round Timer</div>
+        <div class="opt-row" id="timer-selector">
+          <button class="opt-btn" data-seconds="30">30s</button>
+          <button class="opt-btn" data-seconds="45">45s</button>
+          <button class="opt-btn active" data-seconds="60">60s</button>
+          <button class="opt-btn" data-seconds="90">90s</button>
+        </div>
+      </div>
+      <button class="btn btn-reveal mt-8" id="btn-create">Create Room</button>
+      <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
+    </div>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="screen-lobby" class="screen col center gap-16">
+    <div class="lobby-code-section">
+      <div style="text-align:center">
+        <div class="section-label">Room Code</div>
+        <div class="room-code" id="lobby-room-code">----</div>
+        <div class="lobby-join-url" id="lobby-join-url"></div>
+        <div id="lobby-player-address" style="font-size:0.85rem;color:#34C759;font-weight:700;margin-top:6px;background:rgba(52,199,89,0.12);border-radius:8px;padding:6px 12px"></div>
+      </div>
+      <div class="qr-wrap" id="lobby-qr" style="display:none">
+        <img id="lobby-qr-img" width="160" height="160" alt="QR Code">
+      </div>
+    </div>
+    <div id="lobby-scores-section" style="display:none;width:100%;max-width:520px">
+      <div class="section-label mb-8">Scores</div>
+      <div class="score-grid" id="lobby-scores"></div>
+    </div>
+    <div style="width:100%;max-width:520px">
+      <div class="section-label mb-8">Players (<span id="player-count">0</span>)</div>
+      <div class="player-groups" id="player-groups"></div>
+    </div>
+    <div class="lobby-actions">
+      <button class="btn btn-reveal" id="btn-start-codes">Set The Codes</button>
+      <button class="btn btn-ghost" id="btn-end-game-lobby" style="display:none">End Game</button>
+    </div>
+  </div>
+
+  <!-- SETTING CODES (ticks only — never the codes) -->
+  <div id="screen-codes" class="screen col center gap-20">
+    <h2 class="heading" style="font-size:1.8rem">Each side is picking a secret code</h2>
+    <p style="color:var(--text-muted);font-weight:600" id="codes-hint">4 digits, all different — on their own phones.</p>
+    <div class="ready-row" id="ready-row"></div>
+    <div class="lobby-actions">
+      <button class="btn btn-reveal" id="btn-start-match" disabled>Start The Duel</button>
+      <button class="btn btn-ghost" id="btn-end-game-codes">End Game</button>
+    </div>
+  </div>
+
+  <!-- MATCH (the TV) -->
+  <div id="screen-match" class="screen col center gap-0">
+    <div class="m-inner">
+      <div class="m-round" id="m-round">Round 1</div>
+      <div class="m-timer" id="m-timer">1:00</div>
+      <div id="one-away">🔥 ONE AWAY!</div>
+      <div class="boards" id="boards"></div>
+      <div class="lobby-actions">
+        <button class="btn btn-ghost" id="btn-end-match">End Match Early</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MATCH OVER (the reveal) -->
+  <div id="screen-over" class="screen col center gap-0">
+    <div class="o-inner">
+      <div style="font-size:2.2rem" id="over-emoji">🎉</div>
+      <div id="over-headline" style="font-family:'Fredoka',sans-serif;font-size:1.7rem;font-weight:700;text-align:center"></div>
+      <div class="section-label" style="margin:0">The codes were</div>
+      <div class="reveal-row" id="reveal-row"></div>
+      <div class="score-grid" id="over-scores" style="max-width:640px"></div>
+      <div class="lobby-actions">
+        <button class="btn btn-reveal" id="btn-next-match">Next Match</button>
+        <button class="btn btn-ghost" id="btn-end-game">End Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-20">
+    <div style="font-size:3rem">🏆</div>
+    <h2 class="heading" style="font-size:2rem">Final Scores</h2>
+    <div class="leaderboard" id="final-leaderboard"></div>
+    <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/kill-and-injury/js/sounds.js"></script>
+  <script src="/games/kill-and-injury/js/host.js"></script>
+</body>
+</html>

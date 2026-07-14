@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kill &amp; Injury</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .join-logo { font-family: 'Fredoka', sans-serif; font-size: 2rem; font-weight: 700; margin-bottom: 4px; }
+    .team-btn { width: 100%; padding: 16px 20px; border-radius: 16px; border: 2px solid transparent; font-family: 'Fredoka', sans-serif; font-size: 1.2rem; font-weight: 700; cursor: pointer; color: #fff; transition: transform 0.1s; text-align: center; }
+    .team-btn:active { transform: scale(0.97); }
+    .sec-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.4); text-align: center; }
+
+    .waiting-team-badge { font-family: 'Fredoka', sans-serif; font-size: 1.4rem; font-weight: 700; padding: 10px 24px; border-radius: 14px; }
+    .waiting-label { font-size: 1.05rem; color: rgba(255,255,255,0.7); font-weight: 600; margin-top: 8px; text-align: center; }
+
+    /* Digit input shared by the code screen and the guess box */
+    .digit-input {
+      font-family: 'Fredoka', sans-serif !important;
+      font-size: 2.2rem !important;
+      letter-spacing: 0.5em !important;
+      text-align: center !important;
+      padding: 14px 14px 14px 24px !important;
+      width: 100%;
+    }
+    .digit-input:disabled { opacity: 0.45; }
+    .shake { animation: ki-shake 0.35s; }
+    @keyframes ki-shake {
+      0%,100% { transform: translateX(0); }
+      25% { transform: translateX(-7px); } 75% { transform: translateX(7px); }
+    }
+    .msg { min-height: 1.3em; font-weight: 700; font-size: 0.9rem; text-align: center; }
+    .msg.bad  { color: #FF2D55; }
+    .msg.good { color: #34C759; }
+    .msg.warn { color: #FF9500; }
+
+    /* ── Code-setting screen ── */
+    #screen-code { justify-content: flex-start; padding-top: 26px; }
+    .code-inner { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 14px; align-items: center; }
+    .your-code-box {
+      width: 100%; text-align: center; padding: 14px;
+      border-radius: 14px; background: rgba(52,199,89,0.12); border: 1px solid rgba(52,199,89,0.4);
+    }
+    .your-code-box .code {
+      font-family: 'Fredoka', sans-serif; font-size: 2.4rem; font-weight: 700;
+      color: #34C759; letter-spacing: 0.3em; padding-left: 0.3em;
+    }
+    .your-code-box .by { font-size: 0.75rem; color: rgba(255,255,255,0.5); font-weight: 600; }
+
+    /* ── Match screen ── */
+    #screen-match { justify-content: flex-start; padding-top: 12px; overflow-y: auto; }
+    .m-inner { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+    .m-top { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
+    .m-timer { font-family: 'Fredoka', sans-serif; font-size: 1.9rem; font-weight: 700; color: #34C759; transition: color 0.3s; }
+    .m-timer.warning { color: #FF9500; }
+    .m-timer.danger  { color: #FF2D55; animation: ki-pulse 0.6s ease-in-out infinite; }
+    @keyframes ki-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+    .m-round { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 0.85rem; color: rgba(255,255,255,0.55); }
+    .m-mycode { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 0.9rem; padding: 5px 12px; border-radius: 20px; letter-spacing: 0.15em; }
+
+    /* Opponent lock indicator — the pressure */
+    #opp-lock {
+      width: 100%; text-align: center; border-radius: 10px; padding: 7px;
+      font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 0.85rem;
+      background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5);
+      transition: all 0.3s;
+    }
+    #opp-lock.locked { background: rgba(255,45,85,0.18); border: 1px solid #FF2D55; color: #FF2D55; }
+
+    /* Boards */
+    .boards { display: flex; gap: 8px; width: 100%; }
+    .board { flex: 1; min-width: 0; }
+    .board-head {
+      font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+      text-align: center; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .board-rows { display: flex; flex-direction: column; gap: 3px; }
+    .brow {
+      display: flex; align-items: center; gap: 5px; justify-content: center;
+      background: rgba(255,255,255,0.05); border-radius: 7px; padding: 5px 6px;
+      font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 0.85rem;
+      animation: ki-pop 0.3s ease-out;
+    }
+    @keyframes ki-pop { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .brow .g { letter-spacing: 0.1em; color: #fff; }
+    .brow .k { color: #FF2D55; font-size: 0.78rem; }
+    .brow .i { color: #FF9500; font-size: 0.78rem; }
+    .brow.forfeit { opacity: 0.4; font-size: 0.7rem; }
+    .brow.crack { background: rgba(52,199,89,0.25); border: 1px solid #34C759; }
+    .brow.close { background: rgba(255,149,0,0.2); border: 1px solid #FF9500; }
+
+    /* Shared notepad */
+    #notepad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; }
+    .note {
+      aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center;
+      border-radius: 10px; cursor: pointer; user-select: none;
+      font-family: 'Fredoka', sans-serif; font-size: 1.4rem; font-weight: 700;
+      background: rgba(255,255,255,0.07); border: 2px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.8); transition: all 0.15s;
+      position: relative;
+    }
+    .note:active { transform: scale(0.92); }
+    .note.out {
+      background: rgba(255,45,85,0.12); border-color: rgba(255,45,85,0.5);
+      color: rgba(255,255,255,0.28); text-decoration: line-through;
+    }
+    .note.in {
+      background: rgba(52,199,89,0.2); border-color: #34C759; color: #34C759;
+    }
+    .note.in::after {
+      content: '✓'; position: absolute; top: 1px; right: 4px; font-size: 0.6rem;
+    }
+
+    /* Match over */
+    #screen-over { justify-content: flex-start; padding-top: 24px; overflow-y: auto; }
+    .reveal-row { display: flex; gap: 10px; width: 100%; }
+    .reveal-card { flex: 1; border-radius: 14px; padding: 12px; text-align: center; }
+    .reveal-card .lbl { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.75; }
+    .reveal-card .code {
+      font-family: 'Fredoka', sans-serif; font-size: 1.9rem; font-weight: 700;
+      letter-spacing: 0.2em; padding-left: 0.2em; margin-top: 2px;
+    }
+    #screen-game-over { justify-content: flex-start; padding-top: 40px; }
+    #screen-host-disconnected { position: fixed; inset: 0; background: var(--bg); z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+    #screen-host-disconnected.active { display: flex; }
+  </style>
+</head>
+<body>
+
+  <!-- JOIN -->
+  <div id="screen-join" class="screen active col center gap-20">
+    <div class="col center gap-4">
+      <span style="font-size:2.5rem">🕵️</span>
+      <div class="join-logo">Kill &amp; Injury</div>
+    </div>
+    <div class="card col gap-12" style="max-width:360px">
+      <div>
+        <div class="sec-label" style="text-align:left;margin-bottom:6px">Your Name</div>
+        <input type="text" id="input-name" placeholder="Enter your name" maxlength="20" autocomplete="off">
+      </div>
+      <div>
+        <div class="sec-label" style="text-align:left;margin-bottom:6px">Room Code</div>
+        <input type="text" id="input-room" class="room-code-input" placeholder="ABCD" maxlength="4" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="error-msg" id="join-error"></div>
+      <button class="btn btn-primary mt-8" id="btn-join">Join Game</button>
+    </div>
+  </div>
+
+  <!-- TEAM SELECT -->
+  <div id="screen-team-select" class="screen col center gap-16">
+    <div class="col center gap-4">
+      <h2 class="heading" style="font-size:1.8rem">Pick Your Side</h2>
+      <p style="color:var(--text-muted);font-size:0.9rem;font-weight:600">Two sides, one code each</p>
+    </div>
+    <div id="team-buttons" class="col gap-12" style="width:100%;max-width:360px"></div>
+  </div>
+
+  <!-- WAITING -->
+  <div id="screen-waiting" class="screen col center gap-16">
+    <div class="waiting-team-badge" id="waiting-badge">Team</div>
+    <div class="waiting-label" id="waiting-label">Waiting for the host to start...</div>
+    <div style="margin-top:8px;width:100%;max-width:360px">
+      <div class="sec-label" style="margin-bottom:8px">Scores</div>
+      <div class="score-grid" id="waiting-scores"></div>
+    </div>
+  </div>
+
+  <!-- SET YOUR CODE -->
+  <div id="screen-code" class="screen col center gap-0">
+    <div class="code-inner">
+      <div class="waiting-team-badge" id="code-badge">Team</div>
+      <h2 class="heading" style="font-size:1.4rem;text-align:center">Set your secret code</h2>
+      <p style="color:var(--text-muted);font-size:0.85rem;font-weight:600;text-align:center" id="code-hint">
+        4 digits, all different. The other side has to crack it.
+      </p>
+
+      <div class="your-code-box" id="your-code-box" style="display:none">
+        <div class="sec-label">Your team's code</div>
+        <div class="code" id="your-code">----</div>
+        <div class="by" id="your-code-by"></div>
+      </div>
+
+      <input type="text" id="input-code" class="digit-input" placeholder="1234"
+             inputmode="numeric" autocomplete="off" autocorrect="off"
+             autocapitalize="off" spellcheck="false" maxlength="5">
+      <button class="btn btn-primary" id="btn-set-code">Lock It In</button>
+      <div class="msg" id="code-msg"></div>
+      <div class="sec-label" id="code-status">Waiting for both sides...</div>
+    </div>
+  </div>
+
+  <!-- MATCH -->
+  <div id="screen-match" class="screen col center gap-0">
+    <div class="m-inner">
+      <div class="m-top">
+        <div class="m-timer" id="m-timer">--</div>
+        <div class="m-round" id="m-round">Round 1</div>
+        <div class="m-mycode" id="m-mycode">----</div>
+      </div>
+
+      <div id="opp-lock">Opponent is still thinking...</div>
+
+      <div class="tt-input-row" style="display:flex;gap:8px;width:100%">
+        <input type="text" id="input-guess" class="digit-input" placeholder="GUESS"
+               inputmode="numeric" autocomplete="off" autocorrect="off"
+               autocapitalize="off" spellcheck="false" maxlength="5">
+      </div>
+      <button class="btn btn-primary" id="btn-guess">Lock In Guess</button>
+      <div class="msg" id="guess-msg"></div>
+
+      <div class="sec-label" style="margin-top:2px">Shared notepad — tap to mark</div>
+      <div id="notepad"></div>
+      <div style="font-size:0.62rem;color:rgba(255,255,255,0.35);font-weight:600;text-align:center">
+        tap once to rule out · twice to confirm it's in the code · syncs to your team
+      </div>
+
+      <div class="boards" style="margin-top:6px">
+        <div class="board">
+          <div class="board-head" id="head-mine">Your guesses</div>
+          <div class="board-rows" id="board-mine"></div>
+        </div>
+        <div class="board">
+          <div class="board-head" id="head-theirs">Their guesses</div>
+          <div class="board-rows" id="board-theirs"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MATCH OVER -->
+  <div id="screen-over" class="screen col center gap-0">
+    <div class="code-inner" style="max-width:420px">
+      <div style="font-size:2rem" id="over-emoji">🎉</div>
+      <div class="waiting-team-badge" id="over-badge"></div>
+      <div class="waiting-label" id="over-sub"></div>
+      <div class="sec-label" style="margin-top:6px">The codes</div>
+      <div class="reveal-row" id="reveal-row"></div>
+      <div style="width:100%;margin-top:8px">
+        <div class="sec-label" style="margin-bottom:8px">Scores</div>
+        <div class="score-grid" id="over-scores"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-20">
+    <div style="font-size:3rem">🏆</div>
+    <h2 class="heading" style="font-size:2rem">Game Over!</h2>
+    <div class="leaderboard" id="final-leaderboard"></div>
+    <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <!-- HOST DISCONNECTED -->
+  <div id="screen-host-disconnected">
+    <span style="font-size:3rem">😴</span>
+    <h2 class="heading" style="font-size:1.8rem">Host Disconnected</h2>
+    <p style="color:var(--text-muted);font-weight:600">The host has left the game.</p>
+    <button class="btn btn-ghost" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/kill-and-injury/js/sounds.js"></script>
+  <script src="/games/kill-and-injury/js/player.js"></script>
+</body>
+</html>
