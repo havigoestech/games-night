@@ -156,8 +156,10 @@ socket.on('host-attached', (data) => {
   syncDifficultyPickers();
   const codeSec = document.querySelector('#screen-lobby .lobby-code-section');
   if (codeSec) codeSec.style.display = 'none';
-  const diffSec = document.getElementById('lobby-difficulty');
-  if (diffSec && diffSec.parentElement) diffSec.parentElement.style.display = 'none';
+  // Hide ONLY the difficulty picker — it lives in a wrapper now, so this no
+  // longer takes the Start button (its sibling in .lobby-actions) down with it.
+  const diffBlock = document.getElementById('lobby-diff-block');
+  if (diffBlock) diffBlock.style.display = 'none';
   const startBtn = document.getElementById('btn-start-round');
   if (startBtn) startBtn.textContent = `Start (best of ${data.tournamentLength})`;
   const endBtn = document.getElementById('btn-end-game-lobby');
