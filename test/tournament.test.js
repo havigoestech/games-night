@@ -121,14 +121,19 @@ async function main() {
        'no duplicate roster entry after rejoin');
     P.Ada = ada2;
 
-    // ── 6: Start — game not yet tournament-ready ──
-    console.log('\n── 6: Start (unavailable game) ──');
-    // This plan starts with Grab the Mic, which becomes tournament-ready in
-    // Stage 3; for now the host is told rather than failing silently.
-    const unavail = once(host, 'game-unavailable');
-    host.emit('start-tournament');
-    ok((await unavail).slug === 'grab-the-mic',
-       'starting a game that is not tournament-ready yet cleanly tells the host');
+    // ── 6: Start needs 2+ players ── (leaves CODE untouched in lobby for §8)
+    console.log('\n── 6: Start needs enough players ──');
+    const soloHost = track(conn());
+    await once(soloHost, 'connect');
+    soloHost.emit('create-tournament', { mode: 'individual', plan: [{ slug: 'text-twist', length: 1 }], placement: [10] });
+    const soloCreated = await once(soloHost, 'tournament-created');
+    const oneP = track(conn());
+    await once(oneP, 'connect');
+    oneP.emit('join-room', { roomCode: soloCreated.roomCode, playerName: 'Solo', teamIndex: -1, playerId: 'pid-solo1' });
+    await once(oneP, 'joined');
+    const blocked = once(soloHost, 'start-blocked');
+    soloHost.emit('start-tournament');
+    ok(/at least 2/i.test((await blocked).message), 'a tournament needs 2+ players to start');
 
     // ── 7: Individual mode ──
     console.log('\n── 7: Individual mode ──');

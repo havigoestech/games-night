@@ -1,4 +1,5 @@
 const QRCode = require('qrcode');
+const orchestrator = require('../tournament/orchestrator');
 
 const TEAM_COLORS = [
   '#FF2D55', '#5856D6', '#FF9500', '#34C759',
@@ -151,6 +152,19 @@ module.exports = function registerGrabTheMic(namespace, localIP, port) {
     socket.isHost = false;
     socket.emit('joined', { roomCode: room.roomCode, teamIndex: player.teamIndex, ...snapshot(room) });
     emitPlayers(room);
+  }
+
+  // Ends the game once and, in a tournament, reports final standings back.
+  function concludeGame(room) {
+    if (room.concluded) return;
+    room.concluded = true;
+    clearRoomTimer(room);
+    room.phase = 'game-over';
+    const scores = getScores(room).sort((a, b) => b.score - a.score);
+    namespace.to(room.roomCode).emit('game-over', { scores });
+    if (room.tournament && typeof room.onComplete === 'function') {
+      try { room.onComplete(scores); } catch (e) { console.error('[grab-the-mic] onComplete error:', e.message); }
+    }
   }
 
   namespace.on('connection', (socket) => {
@@ -443,6 +457,10 @@ module.exports = function registerGrabTheMic(namespace, localIP, port) {
         goalReached,
         timedOut: false
       });
+
+      // In a tournament the score goal IS the finish line — once it's hit, wrap
+      // up automatically (a beat later, so the result screen shows first).
+      if (room.tournament && goalReached) setTimeout(() => concludeGame(room), 4500);
     });
 
     // Host chose to keep playing after the score goal was hit — raise it by 5.
@@ -462,13 +480,30 @@ module.exports = function registerGrabTheMic(namespace, localIP, port) {
     });
 
     socket.on('end-game', () => {
-      const roomCode = socket.roomCode;
-      const room = rooms.get(roomCode);
+      const room = rooms.get(socket.roomCode);
       if (!room || !socket.isHost) return;
-      clearRoomTimer(room);
-      room.phase = 'game-over';
-      const scores = getScores(room).sort((a, b) => b.score - a.score);
-      namespace.to(roomCode).emit('game-over', { scores });
+      concludeGame(room);
+    });
+
+    // Tournament: adopt the pre-created (pre-seeded) game room as its host.
+    socket.on('claim-host', ({ roomCode }) => {
+      const code = (roomCode || '').toUpperCase().trim();
+      const room = rooms.get(code);
+      if (!room || !room.tournament) return;
+      room.hostSocketId = socket.id;
+      socket.join(code);
+      socket.roomCode = code;
+      socket.isHost = true;
+      socket.emit('host-attached', {
+        roomCode: code,
+        teams: room.teams.map(t => ({ name: t.name, color: t.color })),
+        mode: room.mode,
+        scoreGoal: room.scoreGoal,
+        singingTime: room.singingTime,
+        buzzCountdown: room.buzzCountdown,
+        ...snapshot(room)
+      });
+      emitPlayers(room);
     });
 
     socket.on('disconnect', () => {
@@ -490,5 +525,46 @@ module.exports = function registerGrabTheMic(namespace, localIP, port) {
         }
       }
     });
+  });
+
+  // ── Tournament integration (gated by room.tournament) ───────
+  orchestrator.register('grab-the-mic', ({ roster, teams, mode, config, length, onComplete }) => {
+    const roomCode = generateRoomCode();
+    const gameMode = mode === 'individual' ? 'individual' : 'teams';
+    const builtTeams = (teams || []).map((t, i) => ({
+      name: t.name, color: t.color || TEAM_COLORS[i % TEAM_COLORS.length], score: 0
+    }));
+    const validSing = [8, 10, 12, 15];
+    const singTime = validSing.includes(parseInt(config && config.singingTime)) ? parseInt(config.singingTime) : 10;
+    const validBuzz = [3, 5, 8, 10];
+    const buzzTime = validBuzz.includes(parseInt(config && config.buzzCountdown)) ? parseInt(config.buzzCountdown) : 3;
+
+    const room = {
+      roomCode,
+      hostSocketId: null,
+      teams: builtTeams,
+      players: (roster || []).map(r => ({ socketId: null, playerId: r.playerId, name: r.name, teamIndex: r.teamIndex, connected: false })),
+      phase: 'lobby',
+      currentWord: null,
+      wordList: shuffle(WORDS),
+      wordIndex: 0,
+      buzzLocked: false,
+      buzzer: null,
+      round: 0,
+      countdownTimer: null,
+      singingTimer: null,
+      singingTime: singTime,
+      buzzCountdown: buzzTime,
+      scoreGoal: Math.min(Math.max(parseInt(length) || 10, 1), 100),   // first to N is the finish line
+      mode: gameMode,
+      countdownSecondsLeft: null,
+      singingSecondsLeft: null,
+      tournament: true,
+      onComplete,
+      concluded: false
+    };
+    rooms.set(roomCode, room);
+    console.log('[grab-the-mic] tournament room', roomCode, '| play to:', room.scoreGoal, '| players:', room.players.length);
+    return { roomCode };
   });
 };

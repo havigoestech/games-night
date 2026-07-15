@@ -1,5 +1,13 @@
 const socket = io('/grab-the-mic');
 
+// Launched as part of a tournament? Adopt the pre-created room and return when done.
+const TOURNEY = (() => {
+  const p = new URLSearchParams(location.search);
+  const room = p.get('room'), t = p.get('t');
+  return (room && t) ? { room: room.toUpperCase(), t: t.toUpperCase() } : null;
+})();
+if (TOURNEY) socket.on('connect', () => socket.emit('claim-host', { roomCode: TOURNEY.room }));
+
 const TEAM_COLORS = ['#FF2D55','#5856D6','#FF9500','#34C759','#00C7BE','#FF375F','#BF5AF2','#FFD60A'];
 
 let teamCount = 4;
@@ -354,6 +362,20 @@ socket.on('game-over', ({ scores }) => {
   Sounds.gameOver();
   renderLeaderboard('final-leaderboard', scores);
   showScreen('screen-game-over');
+  if (TOURNEY) setTimeout(() => { location.href = `/games/tournament/host.html?room=${TOURNEY.t}`; }, 3500);
+});
+
+// Tournament: adopt the pre-created room — hide the join code/QR, just start.
+socket.on('host-attached', (data) => {
+  gameMode = data.mode || 'teams';
+  scoreGoal = data.scoreGoal || null;
+  currentScores = (data.teams || []).map((t, i) => ({ index: i, name: t.name, color: t.color, score: 0 }));
+  allPlayers = [];
+  const codeSec = document.querySelector('#screen-lobby .lobby-code-section');
+  if (codeSec) codeSec.style.display = 'none';
+  updateGoalChip();
+  renderPlayerGroups();
+  showScreen('screen-lobby');
 });
 
 function renderLeaderboard(containerId, scores) {
