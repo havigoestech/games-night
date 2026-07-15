@@ -2,6 +2,15 @@ const socket = io('/text-twist');
 
 const TEAM_COLORS = ['#FF2D55','#5856D6','#FF9500','#34C759','#00C7BE','#FF375F','#BF5AF2','#FFD60A'];
 
+// Launched as part of a tournament? (?room=<game>&t=<tournament>) Then we adopt
+// the pre-created room as its host and return to the tournament when it ends.
+const TOURNEY = (() => {
+  const p = new URLSearchParams(location.search);
+  const room = p.get('room'), t = p.get('t');
+  return (room && t) ? { room: room.toUpperCase(), t: t.toUpperCase() } : null;
+})();
+if (TOURNEY) socket.on('connect', () => socket.emit('claim-host', { roomCode: TOURNEY.room }));
+
 let teamCount = 2;
 let allPlayers = [];
 let currentScores = [];
@@ -135,6 +144,26 @@ socket.on('qr-ready', ({ qrDataUrl }) => {
     document.getElementById('lobby-qr-img').src = qrDataUrl;
     document.getElementById('lobby-qr').style.display = 'block';
   }
+});
+
+// Tournament: adopt the pre-created room. Players are already being sent in, so
+// hide the join code/QR and just wait to start.
+socket.on('host-attached', (data) => {
+  selectedMode = data.mode || 'teams';
+  currentScores = (data.teams || []).map((t, i) => ({ index: i, name: t.name, color: t.color, score: 0 }));
+  allPlayers = [];
+  nextDifficulty = data.difficulty || 'medium';
+  syncDifficultyPickers();
+  const codeSec = document.querySelector('#screen-lobby .lobby-code-section');
+  if (codeSec) codeSec.style.display = 'none';
+  const diffSec = document.getElementById('lobby-difficulty');
+  if (diffSec && diffSec.parentElement) diffSec.parentElement.style.display = 'none';
+  const startBtn = document.getElementById('btn-start-round');
+  if (startBtn) startBtn.textContent = `Start (best of ${data.tournamentLength})`;
+  const endBtn = document.getElementById('btn-end-game-lobby');
+  if (endBtn) endBtn.style.display = 'none';
+  renderPlayerGroups();
+  showScreen('screen-lobby');
 });
 
 socket.on('create-room-error', ({ message }) => {
@@ -413,6 +442,8 @@ socket.on('game-over', ({ scores }) => {
   Sounds.gameOver();
   renderLeaderboard('final-leaderboard', scores);
   showScreen('screen-game-over');
+  // In a tournament, head back so the standings + next game can pick up.
+  if (TOURNEY) setTimeout(() => { location.href = `/games/tournament/host.html?room=${TOURNEY.t}`; }, 3500);
 });
 
 // ── Helpers ────────────────────────────────────────────────────

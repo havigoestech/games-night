@@ -61,10 +61,19 @@ async function requestWakeLock() {
   } catch (e) { /* unsupported or denied — the reconnect flow covers us */ }
 }
 
+// Launched from a tournament? (?room=<game>&t=<tournament>) Then auto-join the
+// pre-seeded room by device id — no name entry, no team pick — and return to
+// the tournament when the game ends.
+const TOURNEY = (() => {
+  const p = new URLSearchParams(location.search);
+  const room = p.get('room'), t = p.get('t');
+  return (room && t) ? { room: room.toUpperCase(), t: t.toUpperCase() } : null;
+})();
+
 // ── Reconnect / resync ────────────────────────────────────────
 socket.on('connect', () => {
   const sess = savedSession();
-  const roomCode = joinedRoomCode || (sess && sess.roomCode);
+  const roomCode = (TOURNEY && TOURNEY.room) || joinedRoomCode || (sess && sess.roomCode);
   if (roomCode) socket.emit('rejoin-room', { roomCode, playerId });
 });
 
@@ -484,6 +493,8 @@ socket.on('game-over', ({ scores }) => {
   clearSession();
   renderLeaderboard('final-leaderboard', scores);
   showScreen('screen-game-over');
+  // Tournament: head back to the standings (which show this game's placement).
+  if (TOURNEY) setTimeout(() => { location.href = `/games/tournament/player.html?room=${TOURNEY.t}`; }, 3500);
 });
 
 socket.on('host-disconnected', () => {

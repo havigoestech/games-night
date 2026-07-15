@@ -2,6 +2,22 @@ const socket = io('/tournament');
 
 const TEAM_COLORS = ['#FF2D55','#5856D6','#FF9500','#34C759','#00C7BE','#FF375F','#BF5AF2','#FFD60A'];
 
+// A persistent host identity so the tournament survives the host hopping out to
+// each game host page (every hop is a full page load that drops the socket).
+const HOST_ID = (() => {
+  try {
+    let id = localStorage.getItem('tourney-host-id');
+    if (!id) { id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'h-' + Math.random().toString(36).slice(2); localStorage.setItem('tourney-host-id', id); }
+    return id;
+  } catch (e) { return 'h-' + Math.random().toString(36).slice(2); }
+})();
+
+// If we arrive with ?room=, we're returning from a game — reclaim the tournament.
+const returningRoom = new URLSearchParams(location.search).get('room');
+socket.on('connect', () => {
+  if (returningRoom) socket.emit('reclaim-host', { roomCode: returningRoom, hostId: HOST_ID });
+});
+
 // Mirror of the server's GAME_CATALOG — what can go in a line-up.
 const CATALOG = [
   { slug: 'grab-the-mic',    name: 'Grab the Mic', icon: '🎤', twoSided: false, lengthLabel: 'Play to',   lengthDefault: 10 },
@@ -152,7 +168,8 @@ document.getElementById('btn-create').addEventListener('click', () => {
     teamNames,
     plan: lineup.map(g => ({ slug: g.slug, length: g.length, config: {} })),
     placement: placeValues.slice(0, positions),
-    baseUrl: `${location.protocol}//${location.host}`
+    baseUrl: `${location.protocol}//${location.host}`,
+    hostId: HOST_ID
   });
 
   setTimeout(() => { btn.textContent = 'Create Tournament'; btn.disabled = false; }, 8000);
@@ -172,7 +189,6 @@ socket.on('tournament-created', ({ roomCode, joinUrl, localIP, port, teams, plan
   if (ipEl) ipEl.innerHTML = `Players go to: <strong>http://${localIP}:${port}</strong>`;
 
   renderPlanStrip('lobby-plan', plan);
-  renderPlanStrip('ready-plan', plan);
   renderPlayerGroups();
   showScreen('screen-lobby');
 });
@@ -238,11 +254,95 @@ function renderPlayerGroups() {
 }
 
 document.getElementById('btn-start').addEventListener('click', () => socket.emit('start-tournament'));
+document.getElementById('btn-next-game').addEventListener('click', () => socket.emit('next-game'));
+document.getElementById('btn-finish').addEventListener('click', () => socket.emit('end-tournament'));
 
 socket.on('start-blocked', ({ message }) => alert(message));
-
-// Stage 1 stub — confirms the plan + roster are wired. Stage 2 launches games.
-socket.on('tournament-ready', () => {
-  Sounds.go();
-  showScreen('screen-ready');
+socket.on('reclaim-failed', () => { location.href = '/games/tournament/host.html'; });
+socket.on('game-unavailable', ({ name }) => {
+  alert(`${name} isn't tournament-ready yet — it's coming in the next update. Skip it in the line-up for now.`);
+  showScreen('screen-lobby');
 });
+
+// Launch: hop this host screen into the game's host page (it'll return here
+// with ?room= when the game ends).
+socket.on('goto-game', ({ hostUrl, name, icon }) => {
+  Sounds.go();
+  document.getElementById('launching-icon').textContent = icon || '🎮';
+  document.getElementById('launching-title').textContent = `Starting ${name}…`;
+  showScreen('screen-launching');
+  setTimeout(() => { location.href = hostUrl; }, 700);
+});
+
+// Returning from a game — the reclaim snapshot tells us where we are.
+socket.on('host-reclaimed', (snap) => {
+  standings = snap.standings;
+  if (snap.plan) renderPlanStrip('lobby-plan', snap.plan);
+  if (snap.phase === 'between') renderBetween(snap);
+  else if (snap.phase === 'complete') renderComplete(snap);
+  else showScreen('screen-lobby');
+});
+
+function renderBetween(snap) {
+  Sounds.pointAwarded();
+  const last = snap.results[snap.results.length - 1];
+  document.getElementById('between-title').textContent = last ? `${last.name} done!` : 'Game done!';
+
+  // This game's placement result, best first.
+  const res = document.getElementById('between-result');
+  res.innerHTML = '';
+  if (last) {
+    [...last.awarded].sort((a, b) => b.points - a.points).forEach(a => {
+      const chip = document.createElement('div');
+      chip.className = 'plan-chip';
+      chip.innerHTML = `<span class="n">${a.position}</span> <span style="color:${a.color}">${escapeHtml(a.name)}</span> <span style="color:#FFD60A">+${a.points}</span>`;
+      res.appendChild(chip);
+    });
+  }
+
+  renderLeaderboard('between-standings', snap.standings);
+
+  const hasNext = snap.nextGameIndex != null;
+  document.getElementById('btn-next-game').style.display = hasNext ? 'block' : 'none';
+  document.getElementById('btn-finish').style.display = hasNext ? 'none' : 'block';
+  showScreen('screen-between');
+}
+
+function renderComplete(snap) {
+  Sounds.gameOver();
+  const champ = snap.standings[0];
+  document.getElementById('complete-title').innerHTML =
+    champ ? `<span style="color:${champ.color}">${escapeHtml(champ.name)}</span> — Champion!` : 'Tournament Champion!';
+  renderLeaderboard('complete-standings', snap.standings);
+
+  const bd = document.getElementById('complete-breakdown');
+  bd.innerHTML = '';
+  (snap.results || []).forEach(r => {
+    const winner = [...r.awarded].sort((a, b) => b.points - a.points)[0];
+    const chip = document.createElement('div');
+    chip.className = 'plan-chip';
+    chip.innerHTML = `${r.icon} ${escapeHtml(r.name)} → <span style="color:${winner ? winner.color : '#fff'}">${winner ? escapeHtml(winner.name) : '—'}</span>`;
+    bd.appendChild(chip);
+  });
+  showScreen('screen-complete');
+}
+
+socket.on('tournament-over', (snap) => renderComplete({ standings: snap.standings, results: snap.results }));
+
+function renderLeaderboard(containerId, scores) {
+  const container = document.getElementById(containerId);
+  if (!container || !scores) return;
+  container.innerHTML = '';
+  [...scores].sort((a, b) => b.score - a.score).forEach((s, i) => {
+    const isWinner = i === 0;
+    const row = document.createElement('div');
+    row.className = `lb-row${isWinner ? ' winner' : ''}`;
+    if (isWinner) row.style.cssText = `background:${s.color}22;border-color:${s.color}`;
+    row.innerHTML = `
+      <div class="lb-rank">${isWinner ? '👑' : i + 1}</div>
+      <div class="lb-name" style="color:${s.color}">${escapeHtml(s.name)}</div>
+      <div class="lb-score">${s.score}</div>
+    `;
+    container.appendChild(row);
+  });
+}

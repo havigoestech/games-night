@@ -83,13 +83,25 @@
     </div>
   </div>
 
-  <!-- READY (Stage 1 stub) -->
-  <div id="screen-ready" class="screen col center gap-12">
-    <div style="font-size:2.6rem">🏁</div>
-    <h2 class="heading" style="font-size:1.5rem">Get ready!</h2>
-    <p style="color:var(--text-muted);font-weight:600;text-align:center;max-width:320px">
-      The tournament line-up is set. Your games will start on the host's cue.
-    </p>
+  <!-- LAUNCHING -->
+  <div id="screen-launching" class="screen col center gap-12">
+    <div style="font-size:2.8rem" id="launching-icon">🎮</div>
+    <h2 class="heading" style="font-size:1.5rem" id="launching-title">Starting the game…</h2>
+    <p style="color:var(--text-muted);font-weight:600;text-align:center">Get ready!</p>
+  </div>
+
+  <!-- BETWEEN GAMES -->
+  <div id="screen-between" class="screen col center" style="justify-content:flex-start;padding-top:28px">
+    <div class="w-inner">
+      <div style="font-size:2rem">🏁</div>
+      <h2 class="heading" style="font-size:1.4rem" id="between-title">Game done!</h2>
+      <div class="waiting-label" id="between-sub">Here's how it stands…</div>
+      <div style="width:100%">
+        <div class="sec-label" style="margin-bottom:8px">Standings</div>
+        <div class="leaderboard" id="between-standings"></div>
+      </div>
+      <div class="waiting-label" style="font-size:0.9rem" id="between-next">Waiting for the host to start the next game…</div>
+    </div>
   </div>
 
   <!-- GAME OVER -->

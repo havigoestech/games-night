@@ -159,15 +159,39 @@
     </div>
   </div>
 
-  <!-- (Stage 2 will add the between-games standings and per-game host views here) -->
-  <div id="screen-ready" class="screen col center gap-16">
-    <div style="font-size:2.4rem">🏁</div>
-    <h2 class="heading" style="font-size:1.6rem">Line-up locked in!</h2>
-    <p style="color:var(--text-muted);font-weight:600;text-align:center;max-width:420px">
-      The roster and game plan are ready. Launching games in sequence is coming next —
-      for now this confirms everything is wired up.
-    </p>
-    <div class="plan-strip" id="ready-plan"></div>
+  <!-- LAUNCHING (brief, while we hop to the game host page) -->
+  <div id="screen-launching" class="screen col center gap-16">
+    <div style="font-size:2.6rem" id="launching-icon">🎮</div>
+    <h2 class="heading" style="font-size:1.6rem" id="launching-title">Starting the game…</h2>
+    <p style="color:var(--text-muted);font-weight:600">Sending everyone in.</p>
+  </div>
+
+  <!-- BETWEEN GAMES -->
+  <div id="screen-between" class="screen col center gap-16" style="justify-content:flex-start;padding-top:28px">
+    <div style="width:100%;max-width:640px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="font-size:2rem">🏁</div>
+      <h2 class="heading" style="font-size:1.6rem" id="between-title">Game done!</h2>
+      <div id="between-result" class="plan-strip"></div>
+      <div style="width:100%">
+        <div class="section-label mb-8" style="text-align:center">Tournament Standings</div>
+        <div class="leaderboard" id="between-standings"></div>
+      </div>
+      <div class="lobby-actions">
+        <button class="btn btn-reveal" id="btn-next-game">Next Game</button>
+        <button class="btn btn-ghost" id="btn-finish" style="display:none">Finish &amp; Crown the Champion</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPLETE -->
+  <div id="screen-complete" class="screen col center gap-16" style="justify-content:flex-start;padding-top:32px">
+    <div style="font-size:3rem">🏆</div>
+    <h2 class="heading" style="font-size:2rem" id="complete-title">Tournament Champion!</h2>
+    <div class="leaderboard" id="complete-standings"></div>
+    <div style="width:100%;max-width:640px">
+      <div class="section-label mb-8" style="text-align:center">Who Won Each Game</div>
+      <div id="complete-breakdown" class="plan-strip"></div>
+    </div>
     <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
   </div>
 

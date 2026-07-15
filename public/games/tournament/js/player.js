@@ -152,6 +152,9 @@ function applySnapshot(s) {
   if (s.standings) renderStandings(s.standings);
 
   switch (s.phase) {
+    case 'between':
+      renderBetween(s);
+      break;
     case 'complete':
       renderLeaderboard('final-leaderboard', s.standings);
       showScreen('screen-game-over');
@@ -160,6 +163,31 @@ function applySnapshot(s) {
       showScreen('screen-waiting');
   }
 }
+
+const ORDINAL = n => n + (['th','st','nd','rd'][(n % 100 - 20) % 10] || ['th','st','nd','rd'][n % 100] || 'th');
+
+function renderBetween(s) {
+  const last = (s.results && s.results.length) ? s.results[s.results.length - 1] : null;
+  document.getElementById('between-title').textContent = last ? `${last.name} done!` : 'Game done!';
+  if (last) {
+    const mine = last.awarded.find(a => a.teamIndex === myTeamIndex);
+    document.getElementById('between-sub').textContent =
+      mine ? `You finished ${ORDINAL(mine.position)} — +${mine.points} points` : "Here's how it stands…";
+  }
+  renderLeaderboard('between-standings', s.standings);
+  document.getElementById('between-next').textContent =
+    s.nextGameIndex != null ? 'Waiting for the host to start the next game…' : 'Final game done — see the champion!';
+  showScreen('screen-between');
+}
+
+// Launch: hop this phone into the game (it returns here with ?room= at the end).
+socket.on('goto-game', ({ playerUrl, name, icon }) => {
+  Sounds.go();
+  document.getElementById('launching-icon').textContent = icon || '🎮';
+  document.getElementById('launching-title').textContent = `Starting ${name}…`;
+  showScreen('screen-launching');
+  setTimeout(() => { location.href = playerUrl; }, 700);
+});
 
 function renderPlanList(plan) {
   const el = document.getElementById('plan-list');
@@ -180,12 +208,6 @@ function renderPlanList(plan) {
 function renderStandings(standings) {
   renderScoreCards('waiting-standings', standings);
 }
-
-// ── Stage 1 stub ──────────────────────────────────────────────
-socket.on('tournament-ready', () => {
-  Sounds.go();
-  showScreen('screen-ready');
-});
 
 socket.on('tournament-over', ({ standings }) => {
   Sounds.gameOver();
