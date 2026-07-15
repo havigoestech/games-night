@@ -29,6 +29,15 @@ function generateRoomCode() {
   return code;
 }
 
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 // Cumulative tournament standings — score here is PLACEMENT points earned across
 // games, not any single game's raw score.
 function getStandings(room) {
@@ -133,11 +142,28 @@ module.exports = function registerTournament(namespace, localIP, port) {
       return false;
     }
 
-    const roster = room.players.map(p => ({ playerId: p.playerId, name: p.name, teamIndex: p.teamIndex }));
-    const teams = room.teams.map(t => ({ name: t.name, color: t.color }));
+    // Two-sided games (Family Feud, Kill & Injury) need exactly two sides. Two
+    // teams map straight across; otherwise (individuals, or >2 teams) we split
+    // the field into two balanced squads for this game — every player of an
+    // entity stays together, and the squad assignment is remembered so the
+    // result can be handed back to the right people.
+    let roster, teams, launchMode;
+    room.liveSquads = null;
+    if (game.twoSided && !(room.mode === 'teams' && room.teams.length === 2)) {
+      const sideOf = {};   // tournament team index -> squad 0/1
+      shuffle(room.teams.map((_, i) => i)).forEach((ti, k) => { sideOf[ti] = k % 2; });
+      room.liveSquads = sideOf;
+      teams = [{ name: 'Squad A', color: '#00C7BE' }, { name: 'Squad B', color: '#FF9500' }];
+      roster = room.players.map(p => ({ playerId: p.playerId, name: p.name, teamIndex: sideOf[p.teamIndex] }));
+      launchMode = 'teams';
+    } else {
+      roster = room.players.map(p => ({ playerId: p.playerId, name: p.name, teamIndex: p.teamIndex }));
+      teams = room.teams.map(t => ({ name: t.name, color: t.color }));
+      launchMode = room.mode;
+    }
 
     const launched = orchestrator.launch(game.slug, {
-      roster, teams, mode: room.mode,
+      roster, teams, mode: launchMode,
       config: game.config, length: game.length,
       onComplete: (scores) => onGameComplete(room, index, scores)
     });
@@ -166,18 +192,35 @@ module.exports = function registerTournament(namespace, localIP, port) {
     const lastPts = room.placement[room.placement.length - 1] || 1;
     const pointsFor = pos => (room.placement[pos] != null ? room.placement[pos] : lastPts);
 
-    // `scores` is already sorted best-first. Ties (equal game score) share the
+    // `scores` is already sorted best-first; ties (equal game score) share the
     // higher position's points.
     const awarded = [];
-    scores.forEach((entry, pos) => {
-      let pts;
-      if (pos > 0 && entry.score === scores[pos - 1].score) pts = awarded[pos - 1].points;
-      else pts = pointsFor(pos);
-      awarded.push({ teamIndex: entry.index, name: entry.name, color: entry.color, gameScore: entry.score, position: pos + 1, points: pts });
-      if (room.teams[entry.index]) room.teams[entry.index].score += pts;
-    });
+    if (room.liveSquads) {
+      // Squad game: `scores` is the two squads' results (entry.index = squad
+      // 0/1). Everyone on the winning squad gets 1st-place points, the losing
+      // squad 2nd — mapped back to each real tournament entity.
+      const squadPts = {};
+      scores.forEach((entry, pos) => {
+        const pts = (pos > 0 && entry.score === scores[pos - 1].score) ? squadPts[scores[pos - 1].index] : pointsFor(pos);
+        squadPts[entry.index] = pts;
+      });
+      room.teams.forEach((t, ti) => {
+        const squad = room.liveSquads[ti];
+        const pts = squadPts[squad] != null ? squadPts[squad] : 0;
+        t.score += pts;
+        awarded.push({ teamIndex: ti, name: t.name, color: t.color, gameScore: null, position: null, points: pts, squad });
+      });
+      awarded.sort((a, b) => b.points - a.points);
+    } else {
+      scores.forEach((entry, pos) => {
+        const pts = (pos > 0 && entry.score === scores[pos - 1].score) ? awarded[pos - 1].points : pointsFor(pos);
+        awarded.push({ teamIndex: entry.index, name: entry.name, color: entry.color, gameScore: entry.score, position: pos + 1, points: pts });
+        if (room.teams[entry.index]) room.teams[entry.index].score += pts;
+      });
+    }
 
-    room.results.push({ index, slug: room.plan[index].slug, name: room.plan[index].name, icon: room.plan[index].icon, awarded });
+    room.results.push({ index, slug: room.plan[index].slug, name: room.plan[index].name, icon: room.plan[index].icon, awarded, squadded: !!room.liveSquads });
+    room.liveSquads = null;
     room.liveGameRoom = null;
     room.liveGameSlug = null;
     room.phase = 'between';

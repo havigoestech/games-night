@@ -1,5 +1,13 @@
 const socket = io('/family-feud');
 
+// Launched as part of a tournament? Adopt the pre-created room and return when done.
+const TOURNEY = (() => {
+  const p = new URLSearchParams(location.search);
+  const room = p.get('room'), t = p.get('t');
+  return (room && t) ? { room: room.toUpperCase(), t: t.toUpperCase() } : null;
+})();
+if (TOURNEY) socket.on('connect', () => socket.emit('claim-host', { roomCode: TOURNEY.room }));
+
 const TEAM_COLORS = ['#FF2D55', '#5856D6'];
 
 let allPlayers = [];
@@ -83,6 +91,20 @@ socket.on('qr-ready', ({ qrDataUrl }) => {
     document.getElementById('lobby-qr-img').src = qrDataUrl;
     document.getElementById('lobby-qr').style.display = 'block';
   }
+});
+
+// Tournament: adopt the pre-created room, hide the join code/QR, just start.
+socket.on('host-attached', (data) => {
+  currentScores = (data.teams || []).map((t, i) => ({ index: i, name: t.name, color: t.color, score: 0 }));
+  allPlayers = [];
+  const codeSec = document.querySelector('#screen-lobby .lobby-code-section');
+  if (codeSec) codeSec.style.display = 'none';
+  const startBtn = document.getElementById('btn-start-game');
+  if (startBtn) startBtn.textContent = `Start (${data.tournamentLength} questions)`;
+  const endBtn = document.getElementById('btn-end-game-lobby');
+  if (endBtn) endBtn.style.display = 'none';
+  renderPlayerGroups();
+  showScreen('screen-lobby');
 });
 
 socket.on('create-room-error', ({ message }) => {
@@ -503,6 +525,7 @@ socket.on('game-over', ({ scores }) => {
   setPhase('game-over');
   renderLeaderboard('final-leaderboard', scores);
   showScreen('screen-game-over');
+  if (TOURNEY) setTimeout(() => { location.href = `/games/tournament/host.html?room=${TOURNEY.t}`; }, 3500);
 });
 
 // ── Helpers ────────────────────────────────────────────────────

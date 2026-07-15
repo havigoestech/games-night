@@ -1,4 +1,5 @@
 const QRCode = require('qrcode');
+const orchestrator = require('../tournament/orchestrator');
 
 const TEAM_COLORS = [
   '#FF2D55', '#5856D6', '#FF9500', '#34C759',
@@ -708,8 +709,27 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
       winnerTeamColor: winner?.color ?? null,
       reason,
       revealed: snapshot(room).revealed,
-      answerCount: room.currentQuestion ? room.currentQuestion.a.length : 0
+      answerCount: room.currentQuestion ? room.currentQuestion.a.length : 0,
+      tournamentFinalRound: !!room.tournament && room.round >= room.tournamentLength
     });
+
+    // In a tournament this game runs for a fixed number of questions — after the
+    // last one, wrap up automatically and report the result back.
+    if (room.tournament && room.round >= room.tournamentLength) {
+      setTimeout(() => concludeGame(room), 5000);
+    }
+  }
+
+  // Ends the game once and, in a tournament, reports final standings back.
+  function concludeGame(room) {
+    if (room.concluded) return;
+    room.concluded = true;
+    room.phase = 'game-over';
+    const scores = getScores(room).sort((a, b) => b.score - a.score);
+    namespace.to(room.roomCode).emit('game-over', { scores });
+    if (room.tournament && typeof room.onComplete === 'function') {
+      try { room.onComplete(scores); } catch (e) { console.error('[family-feud] onComplete error:', e.message); }
+    }
   }
 
   namespace.on('connection', (socket) => {
@@ -1087,9 +1107,25 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
     socket.on('end-game', () => {
       const room = rooms.get(socket.roomCode);
       if (!room || !socket.isHost) return;
-      room.phase = 'game-over';
-      const scores = getScores(room).sort((a, b) => b.score - a.score);
-      namespace.to(room.roomCode).emit('game-over', { scores });
+      concludeGame(room);
+    });
+
+    // Tournament: adopt the pre-created (pre-seeded) game room as its host.
+    socket.on('claim-host', ({ roomCode }) => {
+      const code = (roomCode || '').toUpperCase().trim();
+      const room = rooms.get(code);
+      if (!room || !room.tournament) return;
+      room.hostSocketId = socket.id;
+      socket.join(code);
+      socket.roomCode = code;
+      socket.isHost = true;
+      socket.emit('host-attached', {
+        roomCode: code,
+        teams: room.teams.map(t => ({ name: t.name, color: t.color })),
+        tournamentLength: room.tournamentLength,
+        ...snapshot(room)
+      });
+      emitPlayers(room);
     });
 
     socket.on('disconnect', () => {
@@ -1110,5 +1146,42 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
         }
       }
     });
+  });
+
+  // ── Tournament integration (gated by room.tournament) ───────
+  orchestrator.register('family-feud', ({ roster, teams, length, onComplete }) => {
+    const roomCode = generateRoomCode();
+    const builtTeams = (teams || []).slice(0, 2).map((t, i) => ({
+      name: t.name, color: t.color || TEAM_COLORS[i], score: 0
+    }));
+    while (builtTeams.length < 2) builtTeams.push({ name: `Team ${builtTeams.length + 1}`, color: TEAM_COLORS[builtTeams.length], score: 0 });
+
+    const room = {
+      roomCode,
+      hostSocketId: null,
+      teams: builtTeams,
+      players: (roster || []).map(r => ({ socketId: null, playerId: r.playerId, name: r.name, teamIndex: r.teamIndex, connected: false })),
+      phase: 'lobby',
+      questions: shuffle(QUESTIONS),
+      questionIndex: 0,
+      currentQuestion: null,
+      round: 0,
+      pot: 0,
+      strikes: 0,
+      revealed: [],
+      buzzLocked: false,
+      faceoff: { buzzer: null, firstAnswer: null, counterTeamIndex: null },
+      faceoffWinnerTeamIndex: null,
+      controllingTeamIndex: null,
+      stealTeamIndex: null,
+      lastRoundResult: null,
+      tournament: true,
+      tournamentLength: Math.min(Math.max(parseInt(length) || 5, 1), 25),
+      onComplete,
+      concluded: false
+    };
+    rooms.set(roomCode, room);
+    console.log('[family-feud] tournament room', roomCode, '| questions:', room.tournamentLength, '| players:', room.players.length);
+    return { roomCode };
   });
 };

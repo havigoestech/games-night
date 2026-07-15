@@ -1,5 +1,13 @@
 const socket = io('/kill-and-injury');
 
+// Launched as part of a tournament? Adopt the pre-created room and return when done.
+const TOURNEY = (() => {
+  const p = new URLSearchParams(location.search);
+  const room = p.get('room'), t = p.get('t');
+  return (room && t) ? { room: room.toUpperCase(), t: t.toUpperCase() } : null;
+})();
+if (TOURNEY) socket.on('connect', () => socket.emit('claim-host', { roomCode: TOURNEY.room }));
+
 const TEAM_COLORS = ['#FF2D55', '#5856D6'];
 
 let allPlayers = [];
@@ -87,6 +95,22 @@ socket.on('room-created', ({ roomCode, joinUrl, localIP, port, teams, codeLength
   document.getElementById('codes-hint').textContent =
     `${len} digits, all different — on their own phones.`;
 
+  renderPlayerGroups();
+  showScreen('screen-lobby');
+});
+
+// Tournament: adopt the pre-created room, hide the join code/QR, just start.
+socket.on('host-attached', (data) => {
+  codeLength = data.codeLength || 4;
+  currentScores = (data.teams || []).map((t, i) => ({ index: i, name: t.name, color: t.color, score: 0 }));
+  allPlayers = [];
+  const codeSec = document.querySelector('#screen-lobby .lobby-code-section');
+  if (codeSec) codeSec.style.display = 'none';
+  document.getElementById('codes-hint').textContent = `${codeLength} digits, all different — on their own phones.`;
+  const startBtn = document.getElementById('btn-start-codes');
+  if (startBtn) startBtn.textContent = `Set The Codes (best of ${data.tournamentLength})`;
+  const endBtn = document.getElementById('btn-end-game-lobby');
+  if (endBtn) endBtn.style.display = 'none';
   renderPlayerGroups();
   showScreen('screen-lobby');
 });
@@ -316,6 +340,7 @@ socket.on('game-over', ({ scores }) => {
   Sounds.gameOver();
   renderLeaderboard('final-leaderboard', scores);
   showScreen('screen-game-over');
+  if (TOURNEY) setTimeout(() => { location.href = `/games/tournament/host.html?room=${TOURNEY.t}`; }, 3500);
 });
 
 // ── Helpers ────────────────────────────────────────────────────

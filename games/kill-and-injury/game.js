@@ -1,4 +1,5 @@
 const QRCode = require('qrcode');
+const orchestrator = require('../tournament/orchestrator');
 
 const TEAM_COLORS = ['#FF2D55', '#5856D6'];
 const ROOM_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -232,8 +233,28 @@ module.exports = function registerKillAndInjury(namespace, localIP, port) {
       points,
       secrets: [room.secrets[0], room.secrets[1]],
       boards: room.boards,
-      scores: getScores(room)
+      scores: getScores(room),
+      tournamentFinalMatch: !!room.tournament && room.match >= room.tournamentLength
     });
+
+    // In a tournament this game runs for a fixed number of matches — after the
+    // last one, wrap up automatically and report the result back.
+    if (room.tournament && room.match >= room.tournamentLength) {
+      setTimeout(() => concludeGame(room), 5000);
+    }
+  }
+
+  // Ends the game once and, in a tournament, reports final standings back.
+  function concludeGame(room) {
+    if (room.concluded) return;
+    room.concluded = true;
+    clearTimers(room);
+    room.phase = 'game-over';
+    const scores = getScores(room).sort((a, b) => b.score - a.score);
+    namespace.to(room.roomCode).emit('game-over', { scores });
+    if (room.tournament && typeof room.onComplete === 'function') {
+      try { room.onComplete(scores); } catch (e) { console.error('[kill-and-injury] onComplete error:', e.message); }
+    }
   }
 
   function beginCodePhase(room) {
@@ -506,10 +527,27 @@ module.exports = function registerKillAndInjury(namespace, localIP, port) {
     socket.on('end-game', () => {
       const room = rooms.get(socket.roomCode);
       if (!room || !socket.isHost) return;
-      clearTimers(room);
-      room.phase = 'game-over';
-      const scores = getScores(room).sort((a, b) => b.score - a.score);
-      namespace.to(room.roomCode).emit('game-over', { scores });
+      concludeGame(room);
+    });
+
+    // Tournament: adopt the pre-created (pre-seeded) game room as its host.
+    socket.on('claim-host', ({ roomCode }) => {
+      const code = (roomCode || '').toUpperCase().trim();
+      const room = rooms.get(code);
+      if (!room || !room.tournament) return;
+      room.hostSocketId = socket.id;
+      socket.join(code);
+      socket.roomCode = code;
+      socket.isHost = true;
+      socket.emit('host-attached', {
+        roomCode: code,
+        teams: room.teams.map(t => ({ name: t.name, color: t.color })),
+        codeLength: room.codeLength,
+        roundSeconds: room.roundSeconds,
+        tournamentLength: room.tournamentLength,
+        ...snapshot(room, null)
+      });
+      emitPlayers(room);
     });
 
     socket.on('disconnect', () => {
@@ -531,6 +569,45 @@ module.exports = function registerKillAndInjury(namespace, localIP, port) {
         }
       }
     });
+  });
+
+  // ── Tournament integration (gated by room.tournament) ───────
+  orchestrator.register('kill-and-injury', ({ roster, teams, config, length, onComplete }) => {
+    const roomCode = generateRoomCode();
+    const builtTeams = (teams || []).slice(0, 2).map((t, i) => ({
+      name: t.name, color: t.color || TEAM_COLORS[i], score: 0
+    }));
+    while (builtTeams.length < 2) builtTeams.push({ name: `Team ${builtTeams.length + 1}`, color: TEAM_COLORS[builtTeams.length], score: 0 });
+    const len = [3, 4, 5].includes(parseInt(config && config.codeLength)) ? parseInt(config.codeLength) : 4;
+    const secs = [30, 45, 60, 90].includes(parseInt(config && config.roundSeconds)) ? parseInt(config.roundSeconds) : 60;
+
+    const room = {
+      roomCode,
+      hostSocketId: null,
+      teams: builtTeams,
+      players: (roster || []).map(r => ({ socketId: null, playerId: r.playerId, name: r.name, teamIndex: r.teamIndex, connected: false })),
+      phase: 'lobby',
+      codeLength: len,
+      roundSeconds: secs,
+      secondsLeft: null,
+      match: 0,
+      round: 0,
+      secrets: [null, null],
+      codeBy: [null, null],
+      boards: [[], []],
+      notes: [freshNotes(), freshNotes()],
+      pending: [null, null],
+      roundTimer: null,
+      revealTimer: null,
+      lastMatchResult: null,
+      tournament: true,
+      tournamentLength: Math.min(Math.max(parseInt(length) || 3, 1), 15),
+      onComplete,
+      concluded: false
+    };
+    rooms.set(roomCode, room);
+    console.log('[kill-and-injury] tournament room', roomCode, '| matches:', room.tournamentLength, '| players:', room.players.length);
+    return { roomCode };
   });
 };
 
