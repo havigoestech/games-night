@@ -366,16 +366,31 @@ socket.on('round-complete', ({ reason, winnerTeamIndex, bonus, topWord, allWords
     if (!byLen.has(w.length)) byLen.set(w.length, []);
     byLen.get(w.length).push(w);
   });
+  // How many teams/individuals are in play decides how we show attribution:
+  // dots don't scale (and the palette only has 8 colours), so past 6 we switch
+  // to an "X/N found" count — which for a big group is the more useful view
+  // anyway, showing at a glance which words were easy vs obscure.
+  const N = scores.length;
+  const useDots = N <= 6;
+
   [...byLen.keys()].sort((a, b) => b - a).forEach(len => {
     const words = byLen.get(len).sort((a, b) => a.word.localeCompare(b.word));
     const wrap = document.createElement('div');
     wrap.className = 'ro-len-group';
     const chips = words.map(w => {
-      const dots = w.foundBy.map(ti =>
-        `<span class="ro-dot" style="background:${currentScores[ti] ? currentScores[ti].color : '#fff'}" title="${escapeHtml(currentScores[ti] ? currentScores[ti].name : '')}"></span>`
-      ).join('');
-      const tail = w.foundBy.length ? dots : '<span class="ro-nobody">MISSED</span>';
-      return `<div class="ro-word${w.foundBy.length ? ' found' : ''}${w.isTopWord ? ' top' : ''}">
+      const found = w.foundBy.length;
+      let tail;
+      if (found === 0) {
+        tail = '<span class="ro-nobody">MISSED</span>';
+      } else if (useDots) {
+        tail = w.foundBy.map(ti =>
+          `<span class="ro-dot" style="background:${currentScores[ti] ? currentScores[ti].color : '#fff'}" title="${escapeHtml(currentScores[ti] ? currentScores[ti].name : '')}"></span>`
+        ).join('');
+      } else {
+        const pct = Math.round((found / N) * 100);
+        tail = `<span class="ro-count" style="background:linear-gradient(90deg, rgba(52,199,89,0.55) ${pct}%, rgba(255,255,255,0.08) ${pct}%)">${found}/${N}</span>`;
+      }
+      return `<div class="ro-word${found ? ' found' : ''}${w.isTopWord ? ' top' : ''}">
         <span>${escapeHtml(w.word)}</span><span class="pts">${w.pts}</span>${tail}
       </div>`;
     }).join('');

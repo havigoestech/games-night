@@ -174,6 +174,9 @@ function applySnapshot(s) {
       document.getElementById('m-round').textContent = `Round ${s.round}`;
       document.getElementById('m-mycode').textContent = s.myCode || '----';
       renderTimer(s.secondsLeft);
+      // Clear any stale result banner from before the reconnect; the boards
+      // themselves are redrawn fresh from the snapshot just below.
+      document.getElementById('guess-msg').textContent = '';
       renderBoards(s.boards);
       iAmLocked = !!s.myGuess;
       setGuessLocked(iAmLocked, s.myGuess);
@@ -219,6 +222,10 @@ socket.on('code-phase', ({ codeLength: len, scores }) => {
   document.getElementById('your-code-box').style.display = 'none';
   document.getElementById('input-code').value = '';
   document.getElementById('code-msg').textContent = '';
+  // Wipe the previous match's guess boards so they don't linger behind the
+  // code-setting screen into the new match's first round.
+  renderBoards([[], []]);
+  document.getElementById('guess-msg').textContent = '';
   renderScoreCards('waiting-scores', scores);
   setCodeHint();
   renderCodeStatus([false, false]);
@@ -282,6 +289,11 @@ socket.on('match-start', ({ codeLength: len }) => {
   const g = document.getElementById('input-guess');
   g.maxLength = len;
   g.placeholder = 'GUESS';
+  // Fresh match — clear the previous match's boards and result banner. The
+  // server only resends boards on the first round-result, so without this the
+  // old kills/injuries rows show through Round 1.
+  renderBoards([[], []]);
+  document.getElementById('guess-msg').textContent = '';
 });
 
 socket.on('round-start', ({ round, secondsLeft }) => {
