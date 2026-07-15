@@ -121,11 +121,14 @@ async function main() {
        'no duplicate roster entry after rejoin');
     P.Ada = ada2;
 
-    // ── 6: Start stub ──
-    console.log('\n── 6: Start (Stage 1 stub) ──');
-    const ready = once(P.Ben, 'tournament-ready');
+    // ── 6: Start — game not yet tournament-ready ──
+    console.log('\n── 6: Start (unavailable game) ──');
+    // This plan starts with Grab the Mic, which becomes tournament-ready in
+    // Stage 3; for now the host is told rather than failing silently.
+    const unavail = once(host, 'game-unavailable');
     host.emit('start-tournament');
-    ok((await ready).plan.length === 3, 'start-tournament signals the line-up is ready (launching is Stage 2)');
+    ok((await unavail).slug === 'grab-the-mic',
+       'starting a game that is not tournament-ready yet cleanly tells the host');
 
     // ── 7: Individual mode ──
     console.log('\n── 7: Individual mode ──');
@@ -149,10 +152,10 @@ async function main() {
     await once(solo2, 'connect');
     solo2.emit('join-room', { roomCode: created2.roomCode, playerName: 'Uma', teamIndex: -1, playerId: 'pid-uma' });
     await once(solo2, 'joined');
-    const blocked = once(host2, 'start-blocked').then(() => false).catch(() => true);
-    host2.emit('start-tournament');   // 2 players — should NOT be blocked
-    const ready2 = await Promise.race([once(host2, 'tournament-ready').then(() => true), sleep(600).then(() => false)]);
-    ok(ready2, 'an individuals tournament with 2+ players can start');
+    const goto = once(solo, 'goto-game');
+    host2.emit('start-tournament');   // 2 players, Text-Twist-first plan → launches
+    const g = await goto;
+    ok(g.slug === 'text-twist', 'an individuals tournament with 2+ players launches its first game');
 
     // ── 8: Host disconnect tears down ──
     console.log('\n── 8: Teardown ──');

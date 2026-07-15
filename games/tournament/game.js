@@ -1,4 +1,5 @@
 const QRCode = require('qrcode');
+const orchestrator = require('./orchestrator');
 
 const TEAM_COLORS = [
   '#FF2D55', '#5856D6', '#FF9500', '#34C759',
@@ -83,6 +84,8 @@ function snapshot(room, teamIndex) {
     plan: room.plan,
     placement: room.placement,
     gameIndex: room.gameIndex,
+    nextGameIndex: room.gameIndex + 1 < room.plan.length ? room.gameIndex + 1 : null,
+    liveGame: room.liveGameRoom ? { slug: room.liveGameSlug, roomCode: room.liveGameRoom } : null,
     teams: rawTeams(room),
     standings: getStandings(room),
     teamNames: room.teams.map(t => t.name),
@@ -116,9 +119,82 @@ module.exports = function registerTournament(namespace, localIP, port) {
     emitPlayers(room);
   }
 
+  // Launch game `index` in the plan: hand its slug's launcher a room pre-seeded
+  // with our roster + teams, and a completion callback. Then tell every phone
+  // to hop into that game.
+  function launchGame(room, index) {
+    const game = room.plan[index];
+    if (!orchestrator.isRegistered(game.slug)) {
+      // Stage 2 wires Text Twist first; other games become tournament-ready in
+      // Stage 3. Until then, tell the host rather than failing silently.
+      namespace.to(room.hostSocketId).emit('game-unavailable', {
+        slug: game.slug, name: game.name, index
+      });
+      return false;
+    }
+
+    const roster = room.players.map(p => ({ playerId: p.playerId, name: p.name, teamIndex: p.teamIndex }));
+    const teams = room.teams.map(t => ({ name: t.name, color: t.color }));
+
+    const launched = orchestrator.launch(game.slug, {
+      roster, teams, mode: room.mode,
+      config: game.config, length: game.length,
+      onComplete: (scores) => onGameComplete(room, index, scores)
+    });
+    if (!launched || !launched.roomCode) return false;
+
+    room.gameIndex = index;
+    room.liveGameSlug = game.slug;
+    room.liveGameRoom = launched.roomCode;
+    room.phase = 'in-game';
+
+    namespace.to(room.roomCode).emit('goto-game', {
+      slug: game.slug,
+      name: game.name,
+      icon: game.icon,
+      index,
+      total: room.plan.length,
+      playerUrl: `/games/${game.slug}/player.html?room=${launched.roomCode}&t=${room.roomCode}`,
+      hostUrl: `/games/${game.slug}/host.html?room=${launched.roomCode}&t=${room.roomCode}`
+    });
+    return true;
+  }
+
+  // Called by a game (via the launcher's onComplete) when it finishes. Convert
+  // its finishing order into placement points and add to the running standings.
+  function onGameComplete(room, index, scores) {
+    const lastPts = room.placement[room.placement.length - 1] || 1;
+    const pointsFor = pos => (room.placement[pos] != null ? room.placement[pos] : lastPts);
+
+    // `scores` is already sorted best-first. Ties (equal game score) share the
+    // higher position's points.
+    const awarded = [];
+    scores.forEach((entry, pos) => {
+      let pts;
+      if (pos > 0 && entry.score === scores[pos - 1].score) pts = awarded[pos - 1].points;
+      else pts = pointsFor(pos);
+      awarded.push({ teamIndex: entry.index, name: entry.name, color: entry.color, gameScore: entry.score, position: pos + 1, points: pts });
+      if (room.teams[entry.index]) room.teams[entry.index].score += pts;
+    });
+
+    room.results.push({ index, slug: room.plan[index].slug, name: room.plan[index].name, icon: room.plan[index].icon, awarded });
+    room.liveGameRoom = null;
+    room.liveGameSlug = null;
+    room.phase = 'between';
+
+    namespace.to(room.roomCode).emit('game-complete', {
+      index,
+      gameName: room.plan[index].name,
+      awarded,
+      standings: getStandings(room),
+      nextGameIndex: index + 1 < room.plan.length ? index + 1 : null,
+      results: room.results
+    });
+  }
+
   namespace.on('connection', (socket) => {
 
-    socket.on('create-tournament', ({ mode, teamCount, teamNames, plan, placement, baseUrl }) => {
+    socket.on('create-tournament', ({ mode, teamCount, teamNames, plan, placement, baseUrl, hostId }) => {
       try {
         console.log('[tournament] create-tournament from', socket.id);
         const gameMode = mode === 'individual' ? 'individual' : 'teams';
@@ -143,6 +219,7 @@ module.exports = function registerTournament(namespace, localIP, port) {
         const room = {
           roomCode,
           hostSocketId: socket.id,
+          hostId: hostId ? String(hostId).slice(0, 64) : null,   // survives the host hopping to a game
           mode: gameMode,
           teams,
           players: [],
@@ -268,19 +345,42 @@ module.exports = function registerTournament(namespace, localIP, port) {
       socket.emit('sync', snapshot(room, socket.isHost ? null : socket.teamIndex));
     });
 
-    // ── Stage 2 will implement launching games, capturing results, and
-    //    advancing standings. For now this just acknowledges the plan is ready.
+    // Host: kick off the tournament by launching the first game.
     socket.on('start-tournament', () => {
       const room = rooms.get(socket.roomCode);
       if (!room || !socket.isHost || room.phase !== 'lobby') return;
-      if (room.mode === 'individual' && room.players.length < 2) {
+      if (room.players.length < 2) {
         socket.emit('start-blocked', { message: 'Need at least 2 players to start.' });
         return;
       }
-      // Stage 1 stub — signal readiness without launching a game yet.
-      namespace.to(room.roomCode).emit('tournament-ready', {
-        plan: room.plan, standings: getStandings(room)
-      });
+      launchGame(room, 0);
+    });
+
+    // Host: after the between-games standings, move on to the next game.
+    socket.on('next-game', () => {
+      const room = rooms.get(socket.roomCode);
+      if (!room || !socket.isHost || room.phase !== 'between') return;
+      const next = room.gameIndex + 1;
+      if (next >= room.plan.length) return;
+      launchGame(room, next);
+    });
+
+    // Host: re-attach after hopping out to a game (each hop is a full page load,
+    // so the tournament socket dropped). Matched by the persistent hostId.
+    socket.on('reclaim-host', ({ roomCode, hostId }) => {
+      const code = (roomCode || '').toUpperCase().trim();
+      const room = rooms.get(code);
+      if (!room) { socket.emit('reclaim-failed', { message: 'Tournament not found.' }); return; }
+      if (room.hostId && String(hostId).slice(0, 64) !== room.hostId) {
+        socket.emit('reclaim-failed', { message: 'Not the tournament host.' });
+        return;
+      }
+      room.hostSocketId = socket.id;
+      socket.join(code);
+      socket.roomCode = code;
+      socket.isHost = true;
+      socket.emit('host-reclaimed', { roomCode: code, ...snapshot(room, null) });
+      emitPlayers(room);
     });
 
     socket.on('end-tournament', () => {
@@ -297,8 +397,15 @@ module.exports = function registerTournament(namespace, localIP, port) {
       if (!room) return;
 
       if (socket.isHost) {
-        namespace.to(roomCode).emit('host-disconnected', {});
-        rooms.delete(roomCode);
+        // Once a tournament is under way the host is CONSTANTLY hopping out to
+        // game host pages (each hop drops this socket). Only tear the room down
+        // if they leave from the lobby — otherwise keep it alive so they can
+        // reclaim it by hostId when they come back.
+        room.hostSocketId = null;
+        if (room.phase === 'lobby') {
+          namespace.to(roomCode).emit('host-disconnected', {});
+          rooms.delete(roomCode);
+        }
       } else {
         // Keep the player — they may just be hopping into a game or locking
         // their phone. Marked away, re-bound on return.

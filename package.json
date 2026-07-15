@@ -8,7 +8,8 @@
     "test:ff": "node test/family-feud.test.js",
     "test:tt": "node test/text-twist.test.js",
     "test:ki": "node test/kill-and-injury.test.js",
-    "test:tourney": "node test/tournament.test.js"
+    "test:tourney": "node test/tournament.test.js",
+    "test:tourney-loop": "node test/tournament-loop.test.js"
   },
   "dependencies": {
     "express": "^4.18.2",

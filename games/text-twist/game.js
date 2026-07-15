@@ -1,5 +1,6 @@
 const QRCode = require('qrcode');
 const { dictionary, randomPuzzle, scoreWord, MIN_LEN } = require('./puzzles');
+const orchestrator = require('../tournament/orchestrator');
 
 const TEAM_COLORS = [
   '#FF2D55', '#5856D6', '#FF9500', '#34C759',
@@ -167,6 +168,8 @@ module.exports = function registerTextTwist(namespace, localIP, port) {
       roundPoints: room.teams.map((_, i) => room.roundPoints[i] || 0)
     };
 
+    const finalRound = !!room.tournament && room.round >= room.tournamentLength;
+
     namespace.to(room.roomCode).emit('round-complete', {
       reason,
       winnerTeamIndex,
@@ -175,8 +178,28 @@ module.exports = function registerTextTwist(namespace, localIP, port) {
       topWord: room.puzzle.source,
       allWords,
       roundPoints: room.teams.map((_, i) => room.roundPoints[i] || 0),
-      scores: getScores(room)
+      scores: getScores(room),
+      tournamentFinalRound: finalRound
     });
+
+    // In a tournament this game runs for a fixed number of rounds — after the
+    // last one, wrap up automatically and hand the result back to the
+    // tournament (a beat later, so the round-over reveal has time to show).
+    if (finalRound) setTimeout(() => concludeGame(room), 6000);
+  }
+
+  // Ends the game once and, if it's a tournament game, reports the final
+  // standings back to the tournament via the onComplete callback.
+  function concludeGame(room) {
+    if (room.concluded) return;
+    room.concluded = true;
+    clearRoundTimer(room);
+    room.phase = 'game-over';
+    const scores = getScores(room).sort((a, b) => b.score - a.score);
+    namespace.to(room.roomCode).emit('game-over', { scores });
+    if (room.tournament && typeof room.onComplete === 'function') {
+      try { room.onComplete(scores); } catch (e) { console.error('[text-twist] onComplete error:', e.message); }
+    }
   }
 
   namespace.on('connection', (socket) => {
@@ -468,10 +491,29 @@ module.exports = function registerTextTwist(namespace, localIP, port) {
     socket.on('end-game', () => {
       const room = rooms.get(socket.roomCode);
       if (!room || !socket.isHost) return;
-      clearRoundTimer(room);
-      room.phase = 'game-over';
-      const scores = getScores(room).sort((a, b) => b.score - a.score);
-      namespace.to(room.roomCode).emit('game-over', { scores });
+      concludeGame(room);
+    });
+
+    // Tournament: the host claims an already-created (pre-seeded) game room as
+    // its host, rather than creating one via the setup screen.
+    socket.on('claim-host', ({ roomCode }) => {
+      const code = (roomCode || '').toUpperCase().trim();
+      const room = rooms.get(code);
+      if (!room || !room.tournament) return;
+      room.hostSocketId = socket.id;
+      socket.join(code);
+      socket.roomCode = code;
+      socket.isHost = true;
+      socket.emit('host-attached', {
+        roomCode: code,
+        teams: room.teams.map(t => ({ name: t.name, color: t.color })),
+        mode: room.mode,
+        difficulty: room.difficulty,
+        roundSeconds: room.roundSeconds,
+        tournamentLength: room.tournamentLength,
+        ...snapshot(room, null)
+      });
+      emitPlayers(room);
     });
 
     socket.on('disconnect', () => {
@@ -493,5 +535,50 @@ module.exports = function registerTextTwist(namespace, localIP, port) {
         }
       }
     });
+  });
+
+  // ── Tournament integration ──────────────────────────────────
+  // The tournament calls this to spin up a game room already seeded with its
+  // roster and teams. Players auto-join by playerId (rejoin) — no team pick.
+  // Everything tournament-specific is gated behind room.tournament, so normal
+  // play is byte-for-byte unchanged.
+  orchestrator.register('text-twist', ({ roster, teams, mode, config, length, onComplete }) => {
+    const roomCode = generateRoomCode();
+    const gameMode = mode === 'individual' ? 'individual' : 'teams';
+    const builtTeams = (teams || []).map((t, i) => ({
+      name: t.name, color: t.color || TEAM_COLORS[i % TEAM_COLORS.length], score: 0
+    }));
+    const diff = ['easy', 'medium', 'hard'].includes(config && config.difficulty) ? config.difficulty : 'medium';
+    const secs = [60, 90, 120, 180].includes(parseInt(config && config.roundSeconds)) ? parseInt(config.roundSeconds) : 120;
+
+    const room = {
+      roomCode,
+      hostSocketId: null,
+      teams: builtTeams,
+      players: (roster || []).map(r => ({
+        socketId: null, playerId: r.playerId, name: r.name, teamIndex: r.teamIndex,
+        connected: false, lockedUntil: 0
+      })),
+      phase: 'lobby',
+      mode: gameMode,
+      difficulty: diff,
+      roundSeconds: secs,
+      secondsLeft: null,
+      round: 0,
+      puzzle: null,
+      letters: null,
+      found: {},
+      roundPoints: {},
+      usedSources: new Set(),
+      roundTimer: null,
+      lastRoundResult: null,
+      tournament: true,
+      tournamentLength: Math.min(Math.max(parseInt(length) || 3, 1), 20),
+      onComplete,
+      concluded: false
+    };
+    rooms.set(roomCode, room);
+    console.log('[text-twist] tournament room', roomCode, '| rounds:', room.tournamentLength, '| players:', room.players.length);
+    return { roomCode };
   });
 };
