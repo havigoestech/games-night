@@ -117,6 +117,7 @@
     .ff-gradient   { background: linear-gradient(135deg, #FF9500, #FFD60A); }
     .tt-gradient   { background: linear-gradient(135deg, #00C7BE, #34C759); }
     .ki-gradient   { background: linear-gradient(135deg, #5856D6, #BF5AF2); }
+    .tourney-gradient { background: linear-gradient(135deg, #FFD60A, #FF9500); }
 
     .footer {
       text-align: center;
@@ -136,6 +137,21 @@
   </header>
 
   <div class="games-grid">
+
+    <!-- TOURNAMENT -->
+    <div class="game-card" style="border-color:rgba(255,214,10,0.35)">
+      <div class="card-icon">🏆</div>
+      <span class="card-tag tag-live" style="background:rgba(255,214,10,0.18);color:#FFD60A">Tournament mode</span>
+      <div class="card-title">Tournament</div>
+      <div class="card-desc">
+        String several games into one showdown. Everyone joins once, plays each game in turn, and earns points by finishing position — with a running leaderboard and an overall champion at the end.
+      </div>
+      <div class="card-actions">
+        <button class="btn-host tourney-gradient" style="color:#111" onclick="location.href='/games/tournament/host.html'">
+          Set Up Tournament
+        </button>
+      </div>
+    </div>
 
     <!-- GRAB THE MIC -->
     <div class="game-card">

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Tournament</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .join-logo { font-family: 'Fredoka', sans-serif; font-size: 1.9rem; font-weight: 700; margin-bottom: 4px; }
+    .team-btn { width: 100%; padding: 16px 20px; border-radius: 16px; border: 2px solid transparent; font-family: 'Fredoka', sans-serif; font-size: 1.2rem; font-weight: 700; cursor: pointer; color: #fff; transition: transform 0.1s; text-align: center; }
+    .team-btn:active { transform: scale(0.97); }
+    .sec-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.4); text-align: center; }
+
+    #screen-waiting { justify-content: flex-start; padding-top: 28px; transition: background 0.5s; }
+    .w-inner { width: 100%; max-width: 380px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .waiting-team-badge { font-family: 'Fredoka', sans-serif; font-size: 1.3rem; font-weight: 700; padding: 10px 24px; border-radius: 14px; }
+    .waiting-label { font-size: 1rem; color: rgba(255,255,255,0.7); font-weight: 600; text-align: center; }
+
+    .plan-list { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+    .plan-row {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; padding: 9px 12px;
+    }
+    .plan-row .n { font-family: 'Fredoka', sans-serif; font-weight: 700; color: #FFD60A; width: 18px; }
+    .plan-row .gi { font-size: 1.2rem; }
+    .plan-row .gn { font-family: 'Fredoka', sans-serif; font-weight: 700; flex: 1; }
+    .plan-row .gl { font-size: 0.72rem; font-weight: 700; color: rgba(255,255,255,0.4); }
+
+    #screen-game-over { justify-content: flex-start; padding-top: 40px; }
+    #screen-host-disconnected { position: fixed; inset: 0; background: var(--bg); z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+    #screen-host-disconnected.active { display: flex; }
+  </style>
+</head>
+<body>
+
+  <!-- JOIN -->
+  <div id="screen-join" class="screen active col center gap-20">
+    <div class="col center gap-4">
+      <span style="font-size:2.4rem">🏆</span>
+      <div class="join-logo">Tournament</div>
+    </div>
+    <div class="card col gap-12" style="max-width:360px">
+      <div>
+        <div class="sec-label" style="text-align:left;margin-bottom:6px">Your Name</div>
+        <input type="text" id="input-name" placeholder="Enter your name" maxlength="20" autocomplete="off">
+      </div>
+      <div>
+        <div class="sec-label" style="text-align:left;margin-bottom:6px">Tournament Code</div>
+        <input type="text" id="input-room" class="room-code-input" placeholder="ABCD" maxlength="4" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="error-msg" id="join-error"></div>
+      <button class="btn btn-primary mt-8" id="btn-join">Join Tournament</button>
+    </div>
+  </div>
+
+  <!-- TEAM SELECT -->
+  <div id="screen-team-select" class="screen col center gap-16">
+    <div class="col center gap-4">
+      <h2 class="heading" style="font-size:1.7rem">Pick Your Team</h2>
+      <p style="color:var(--text-muted);font-size:0.9rem;font-weight:600">You'll stay on this team all tournament</p>
+    </div>
+    <div id="team-buttons" class="col gap-12" style="width:100%;max-width:360px"></div>
+  </div>
+
+  <!-- WAITING -->
+  <div id="screen-waiting" class="screen col center">
+    <div class="w-inner">
+      <div class="waiting-team-badge" id="waiting-badge">You</div>
+      <div class="waiting-label" id="waiting-label">You're in! Waiting for the host to start…</div>
+
+      <div style="width:100%">
+        <div class="sec-label" style="margin-bottom:8px">The Line-up</div>
+        <div class="plan-list" id="plan-list"></div>
+      </div>
+
+      <div style="width:100%">
+        <div class="sec-label" style="margin-bottom:8px">Standings</div>
+        <div class="score-grid" id="waiting-standings"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- READY (Stage 1 stub) -->
+  <div id="screen-ready" class="screen col center gap-12">
+    <div style="font-size:2.6rem">🏁</div>
+    <h2 class="heading" style="font-size:1.5rem">Get ready!</h2>
+    <p style="color:var(--text-muted);font-weight:600;text-align:center;max-width:320px">
+      The tournament line-up is set. Your games will start on the host's cue.
+    </p>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-20">
+    <div style="font-size:3rem">🏆</div>
+    <h2 class="heading" style="font-size:2rem">Tournament Over!</h2>
+    <div class="leaderboard" id="final-leaderboard"></div>
+    <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <!-- HOST DISCONNECTED -->
+  <div id="screen-host-disconnected">
+    <span style="font-size:3rem">😴</span>
+    <h2 class="heading" style="font-size:1.8rem">Host Disconnected</h2>
+    <p style="color:var(--text-muted);font-weight:600">The host has left the tournament.</p>
+    <button class="btn btn-ghost" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/tournament/js/sounds.js"></script>
+  <script src="/games/tournament/js/player.js"></script>
+</body>
+</html>

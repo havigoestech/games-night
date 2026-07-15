@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tournament — Host</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .back-link { display: inline-flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.4); font-size: 0.85rem; font-weight: 700; text-decoration: none; margin-bottom: 8px; }
+    .back-link:hover { color: rgba(255,255,255,0.7); }
+    .section-label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 10px; }
+    #screen-setup { justify-content: flex-start; padding-top: 28px; }
+    #screen-setup .card { max-width: 560px; }
+
+    .opt-row { display: flex; gap: 8px; justify-content: center; }
+    .opt-btn {
+      flex: 1; padding: 10px 8px; border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.7); font-family: 'Fredoka', sans-serif;
+      font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+    }
+    .opt-btn:hover { background: rgba(255,255,255,0.15); }
+    .opt-btn.active { background: rgba(255,214,10,0.3); border-color: #FFD60A; color: #fff; }
+    .team-count-row { display: flex; align-items: center; gap: 16px; justify-content: center; margin-bottom: 12px; }
+    .count-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: #fff; font-size: 1.3rem; cursor: pointer; }
+    .count-num { font-family: 'Fredoka', sans-serif; font-size: 2.2rem; font-weight: 700; min-width: 44px; text-align: center; }
+
+    /* Game picker */
+    .game-pick { display: flex; flex-direction: column; gap: 8px; }
+    .game-pick-btn {
+      display: flex; align-items: center; gap: 12px; text-align: left;
+      padding: 12px 14px; border-radius: 14px; cursor: pointer;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+      color: #fff; font-family: 'Nunito', sans-serif; transition: all 0.15s;
+    }
+    .game-pick-btn:hover { background: rgba(255,255,255,0.1); }
+    .game-pick-btn .gi { font-size: 1.6rem; flex-shrink: 0; }
+    .game-pick-btn .gn { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 1.05rem; flex: 1; }
+    .game-pick-btn .add { font-family: 'Fredoka', sans-serif; font-weight: 700; color: #FFD60A; font-size: 1.4rem; }
+    .game-pick-btn .two { font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.08); padding: 2px 7px; border-radius: 10px; }
+
+    /* The line-up */
+    #lineup { display: flex; flex-direction: column; gap: 8px; }
+    #lineup:empty::after { content: 'No games added yet — pick from below.'; color: rgba(255,255,255,0.3); font-size: 0.85rem; font-weight: 600; }
+    .lineup-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 12px;
+      background: rgba(255,214,10,0.08); border: 1px solid rgba(255,214,10,0.3);
+    }
+    .lineup-item .num { font-family: 'Fredoka', sans-serif; font-weight: 700; color: #FFD60A; width: 20px; }
+    .lineup-item .gi { font-size: 1.3rem; }
+    .lineup-item .gn { font-family: 'Fredoka', sans-serif; font-weight: 700; flex: 1; }
+    .lineup-item .len-wrap { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 700; color: rgba(255,255,255,0.6); }
+    .lineup-item input.len { width: 46px; padding: 5px 6px !important; font-size: 0.9rem !important; text-align: center; }
+    .lineup-item .rm { cursor: pointer; color: rgba(255,45,85,0.8); font-size: 1.3rem; font-weight: 700; padding: 0 4px; }
+
+    /* Placement points */
+    .place-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+    .place-cell { text-align: center; }
+    .place-cell .pl { font-size: 0.62rem; font-weight: 800; color: rgba(255,255,255,0.45); text-transform: uppercase; }
+    .place-cell input { width: 52px; padding: 8px 4px !important; text-align: center; font-family: 'Fredoka', sans-serif !important; font-size: 1.1rem !important; }
+
+    /* Lobby */
+    .lobby-code-section { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; }
+    .lobby-join-url { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; word-break: break-all; }
+    #screen-lobby { justify-content: flex-start; padding-top: 28px; }
+    .lobby-actions { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+    .plan-strip { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 640px; }
+    .plan-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px; padding: 6px 14px; font-weight: 700; font-size: 0.85rem;
+    }
+    .plan-chip .n { color: #FFD60A; font-family: 'Fredoka', sans-serif; }
+  </style>
+</head>
+<body>
+
+  <!-- SETUP -->
+  <div id="screen-setup" class="screen col center gap-16 active">
+    <div class="col center gap-4">
+      <a href="/" class="back-link">← Games Night</a>
+      <span style="font-size:2.6rem">🏆</span>
+      <h1 class="heading" style="font-size:2rem">Tournament</h1>
+      <p style="color:var(--text-muted);font-size:0.9rem">Line up the games. One champion at the end.</p>
+    </div>
+    <div class="card col gap-16">
+      <div>
+        <div class="section-label">Play As</div>
+        <div class="opt-row" id="mode-selector">
+          <button class="opt-btn active" data-mode="teams">Teams</button>
+          <button class="opt-btn" data-mode="individual">Individuals</button>
+        </div>
+      </div>
+
+      <div id="teams-setup" class="col gap-12">
+        <div>
+          <div class="section-label">Number of Teams</div>
+          <div class="team-count-row">
+            <button class="count-btn" id="count-down">−</button>
+            <div class="count-num" id="team-count-display">2</div>
+            <button class="count-btn" id="count-up">+</button>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">Team Names</div>
+          <div id="team-name-inputs" class="col gap-8"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">The Line-up</div>
+        <div id="lineup"></div>
+        <div class="game-pick" id="game-pick" style="margin-top:10px"></div>
+      </div>
+
+      <div>
+        <div class="section-label">Points Per Finish</div>
+        <div class="place-row" id="placement"></div>
+        <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);font-weight:600;text-align:center;margin-top:6px">
+          Awarded after each game by finishing position. Lower places get 1 point.
+        </div>
+      </div>
+
+      <button class="btn btn-reveal mt-8" id="btn-create">Create Tournament</button>
+      <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
+    </div>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="screen-lobby" class="screen col center gap-16">
+    <div class="lobby-code-section">
+      <div style="text-align:center">
+        <div class="section-label">Tournament Code</div>
+        <div class="room-code" id="lobby-room-code">----</div>
+        <div class="lobby-join-url" id="lobby-join-url"></div>
+        <div id="lobby-player-address" style="font-size:0.85rem;color:#34C759;font-weight:700;margin-top:6px;background:rgba(52,199,89,0.12);border-radius:8px;padding:6px 12px"></div>
+      </div>
+      <div class="qr-wrap" id="lobby-qr" style="display:none">
+        <img id="lobby-qr-img" width="160" height="160" alt="QR Code">
+      </div>
+    </div>
+
+    <div style="width:100%;max-width:640px">
+      <div class="section-label mb-8">The Line-up</div>
+      <div class="plan-strip" id="lobby-plan"></div>
+    </div>
+
+    <div style="width:100%;max-width:560px">
+      <div class="section-label mb-8">Players (<span id="player-count">0</span>)</div>
+      <div class="player-groups" id="player-groups"></div>
+    </div>
+
+    <div class="lobby-actions">
+      <button class="btn btn-reveal" id="btn-start">Start Tournament</button>
+      <button class="btn btn-ghost" id="btn-cancel" onclick="location.href='/'">Cancel</button>
+    </div>
+  </div>
+
+  <!-- (Stage 2 will add the between-games standings and per-game host views here) -->
+  <div id="screen-ready" class="screen col center gap-16">
+    <div style="font-size:2.4rem">🏁</div>
+    <h2 class="heading" style="font-size:1.6rem">Line-up locked in!</h2>
+    <p style="color:var(--text-muted);font-weight:600;text-align:center;max-width:420px">
+      The roster and game plan are ready. Launching games in sequence is coming next —
+      for now this confirms everything is wired up.
+    </p>
+    <div class="plan-strip" id="ready-plan"></div>
+    <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/tournament/js/sounds.js"></script>
+  <script src="/games/tournament/js/host.js"></script>
+</body>
+</html>
