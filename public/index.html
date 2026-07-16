@@ -113,6 +113,25 @@
     }
     .btn-host:active { transform: scale(0.97); }
 
+    /* Guests are told "Players go to: <this page>", so every card needs a way in
+       — not just a way to host. Outlined rather than gradient so the host's
+       action still leads, but sized the same because both are real entry points. */
+    .btn-join {
+      flex: 1;
+      padding: 13px 16px;
+      border: 1.5px solid rgba(255,255,255,0.22);
+      border-radius: 14px;
+      background: transparent;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      color: rgba(255,255,255,0.92);
+    }
+    .btn-join:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.4); }
+    .btn-join:active { transform: scale(0.97); }
+
     .gtm-gradient  { background: linear-gradient(135deg, #FF2D55, #FF9500); }
     .ff-gradient   { background: linear-gradient(135deg, #FF9500, #FFD60A); }
     .tt-gradient   { background: linear-gradient(135deg, #00C7BE, #34C759); }
@@ -133,7 +152,7 @@
   <header class="header">
     <span class="emoji">🎮</span>
     <h1>Games Night</h1>
-    <p>Pick a game and start hosting</p>
+    <p>Host a game on the big screen, or join one from your phone</p>
   </header>
 
   <div class="games-grid">
@@ -147,8 +166,11 @@
         String several games into one showdown. Everyone joins once, plays each game in turn, and earns points by finishing position — with a running leaderboard and an overall champion at the end.
       </div>
       <div class="card-actions">
-        <button class="btn-host tourney-gradient" style="color:#111" onclick="location.href='/games/tournament/host.html'">
+        <button class="btn-host tourney-gradient" style="color:#111;flex:1.7" onclick="location.href='/games/tournament/host.html'">
           Set Up Tournament
+        </button>
+        <button class="btn-join" onclick="location.href='/games/tournament/player.html'">
+          Join
         </button>
       </div>
     </div>
@@ -165,6 +187,9 @@
         <button class="btn-host gtm-gradient" onclick="location.href='/games/grab-the-mic/host.html'">
           Host Game
         </button>
+        <button class="btn-join" onclick="location.href='/games/grab-the-mic/player.html'">
+          Join Game
+        </button>
       </div>
     </div>
 
@@ -179,6 +204,9 @@
       <div class="card-actions">
         <button class="btn-host ff-gradient" id="btn-ff" onclick="location.href='/games/family-feud/host.html'">
           Host Game
+        </button>
+        <button class="btn-join" onclick="location.href='/games/family-feud/player.html'">
+          Join Game
         </button>
       </div>
     </div>
@@ -195,6 +223,9 @@
         <button class="btn-host tt-gradient" onclick="location.href='/games/text-twist/host.html'">
           Host Game
         </button>
+        <button class="btn-join" onclick="location.href='/games/text-twist/player.html'">
+          Join Game
+        </button>
       </div>
     </div>
 
@@ -209,6 +240,9 @@
       <div class="card-actions">
         <button class="btn-host ki-gradient" onclick="location.href='/games/kill-and-injury/host.html'">
           Host Game
+        </button>
+        <button class="btn-join" onclick="location.href='/games/kill-and-injury/player.html'">
+          Join Game
         </button>
       </div>
     </div>
