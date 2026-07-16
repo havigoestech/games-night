@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "dev": "DEV_TOOLS=1 node server.js",
     "test:ff": "node test/family-feud.test.js",
     "test:tt": "node test/text-twist.test.js",
     "test:ki": "node test/kill-and-injury.test.js",

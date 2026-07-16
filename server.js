@@ -22,6 +22,10 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Local testing tools (npm run dev). Off unless DEV_TOOLS=1, so the deployed
+// hub never serves them. Must precede express.static to intercept .html.
+if (process.env.DEV_TOOLS === '1') require('./dev')(app);
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Register each game as a Socket.IO namespace
