@@ -109,8 +109,10 @@ socket.on('host-attached', (data) => {
   document.getElementById('codes-hint').textContent = `${codeLength} digits, all different — on their own phones.`;
   const startBtn = document.getElementById('btn-start-codes');
   if (startBtn) startBtn.textContent = `Set The Codes (best of ${data.tournamentLength})`;
+  // The host needs a way out of a game they'd rather not play: ending it here
+  // concludes 0-0 (a tie) and the tournament moves on to the next game.
   const endBtn = document.getElementById('btn-end-game-lobby');
-  if (endBtn) endBtn.style.display = 'none';
+  if (endBtn) endBtn.style.display = 'block';
   renderPlayerGroups();
   showScreen('screen-lobby');
 });

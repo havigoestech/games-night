@@ -232,3 +232,23 @@ input[type="text"]::placeholder { color: rgba(255,255,255,0.35); }
   .score-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .screen { padding: 40px 32px; }
 }
+
+/* Attaching to an existing room (see /js/boot.js) — hold the screens back so the
+   default one can't paint before the server tells us which is right. Silent for
+   the first 450ms so a fast attach shows nothing at all; only a genuinely slow
+   connection ever surfaces the hint. */
+html.attaching .screen { display: none !important; }
+html.attaching body::after {
+  content: 'Connecting…';
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-family: 'Nunito', system-ui, sans-serif;
+  font-size: 15px;
+  opacity: 0;
+  animation: attach-hint 200ms ease-out 450ms forwards;
+}
+@keyframes attach-hint { to { opacity: 1; } }

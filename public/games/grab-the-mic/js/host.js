@@ -373,6 +373,10 @@ socket.on('host-attached', (data) => {
   allPlayers = [];
   const codeSec = document.querySelector('#screen-lobby .lobby-code-section');
   if (codeSec) codeSec.style.display = 'none';
+  // The host needs a way out of a game they'd rather not play: ending it here
+  // concludes 0-0 (a tie) and the tournament moves on to the next game.
+  const endBtn = document.getElementById('btn-end-game-lobby');
+  if (endBtn) endBtn.style.display = 'block';
   updateGoalChip();
   renderPlayerGroups();
   showScreen('screen-lobby');

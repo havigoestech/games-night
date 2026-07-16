@@ -162,8 +162,10 @@ socket.on('host-attached', (data) => {
   if (diffBlock) diffBlock.style.display = 'none';
   const startBtn = document.getElementById('btn-start-round');
   if (startBtn) startBtn.textContent = `Start (best of ${data.tournamentLength})`;
+  // The host needs a way out of a game they'd rather not play: ending it here
+  // concludes 0-0 (a tie) and the tournament moves on to the next game.
   const endBtn = document.getElementById('btn-end-game-lobby');
-  if (endBtn) endBtn.style.display = 'none';
+  if (endBtn) endBtn.style.display = 'block';
   renderPlayerGroups();
   showScreen('screen-lobby');
 });
