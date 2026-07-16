@@ -20,6 +20,27 @@ function ok(cond, label) {
   else      { failed++; console.log('  ❌', label); }
 }
 
+// Which of `answers` actually appear in a payload sent to a client.
+//
+// Scans the payload's string VALUES. Substring-matching the raw JSON blob (the
+// obvious approach) also hits object KEYS: ~6% of puzzles hide an answer like
+// "name", "mode" or "word" that collides with one, so a snapshot's own
+// `"name":"Ada"` read as a leak and this suite flaked on 1-in-17 runs. The rack
+// is skipped — it's an anagram of the source and can coincidentally spell an
+// answer without anything having leaked.
+function leakedAnswers(payload, answers, except = []) {
+  const values = [];
+  (function walk(v) {
+    if (typeof v === 'string') values.push(v.toLowerCase());
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') {
+      for (const [k, child] of Object.entries(v)) if (k !== 'letters') walk(child);
+    }
+  })(payload);
+  const seen = new Set(values);
+  return answers.filter(w => !except.includes(w) && seen.has(w.toLowerCase()));
+}
+
 const conn = () => io(BASE, { transports: ['websocket'], forceNew: true, reconnection: false });
 
 function once(sock, ev, timeout = 8000) {
@@ -123,10 +144,7 @@ async function main() {
     ok(!!puzzle, 'test can resolve the live puzzle from the rack');
     const answers = puzzle.words;
 
-    const leaks = (payload) => {
-      const blob = JSON.stringify(payload).toLowerCase();
-      return answers.filter(w => blob.includes(`"${w}"`));
-    };
+    const leaks = (payload) => leakedAnswers(payload, answers);
     ok(leaks(hRS).length === 0, 'round-start to HOST leaks no answer text');
     ok(leaks(aRS).length === 0, 'round-start to PLAYER leaks no answer text');
 
@@ -252,9 +270,14 @@ async function main() {
     ok(rc.reason === 'board-clear' && rc.winnerTeamIndex === 1, 'the round ends immediately on a board clear');
     ok(rc.allWords.length === answers.length && rc.allWords.every(w => typeof w.word === 'string'),
        'round-complete finally reveals every word');
+    // Any word using every letter scores the same, and 18% of puzzles have an
+    // anagram of the source in their answer list (trading/darting). Which of the
+    // tied words gets flagged is the server's choice and not what's under test —
+    // assert the rule (a longest word, worth 240), not the identity.
     const topWord = rc.allWords.find(w => w.isTopWord);
-    ok(topWord && topWord.word === puzzle.source && topWord.pts === 240,
-       `the top word is revealed as ${puzzle.source.toUpperCase()} (240 pts)`);
+    const longest = answers.filter(w => w.length === puzzle.source.length);
+    ok(topWord && longest.includes(topWord.word) && topWord.pts === 240,
+       `the top word is revealed as ${(topWord ? topWord.word : '?').toUpperCase()} (240 pts)`);
     const w1entry = rc.allWords.find(w => w.word === w1);
     ok(w1entry.foundBy.includes(0) && w1entry.foundBy.includes(1), `"${w1}" is attributed to BOTH teams that found it`);
     const blues = rc.scores[1].score;
@@ -287,7 +310,7 @@ async function main() {
     ok(rej2.phase === 'round' && rej2.letters === rack2, 'rejoin restores the round and the same letter rack');
     ok(rej2.secondsLeft > 0 && rej2.secondsLeft < 60, `rejoin restores a LIVE timer (${rej2.secondsLeft}s left, not 60)`);
     ok(rej2.myWords.some(e => e.word === adaWord), "rejoin restores the team's found words");
-    const leaked2 = puz2.words.filter(w => w !== adaWord && JSON.stringify(rej2).toLowerCase().includes(`"${w}"`));
+    const leaked2 = leakedAnswers(rej2, puz2.words, [adaWord]);
     ok(leaked2.length === 0, 'rejoin snapshot carries ONLY the words already found — no unfound answers leak');
     await sleep(200);
     ok(roster.latest.allPlayers.length === 4 &&
