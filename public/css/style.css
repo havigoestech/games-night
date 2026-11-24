@@ -219,9 +219,14 @@ input[type="text"]::placeholder { color: rgba(255,255,255,0.35); }
   display: none;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: center;        /* fallback for old browsers */
+  justify-content: safe center;   /* center when it fits, but top-align (and stay
+                                     scrollable) when content is taller than the
+                                     screen — never trap the top off-screen */
   width: 100%;
-  height: 100vh;
+  height: 100vh;   /* fallback for browsers without dvh */
+  height: 100dvh;  /* visible viewport — excludes the mobile browser toolbar, so
+                      a screen's bottom is never stranded behind it */
   padding: 24px 20px;
   overflow-y: auto;
   text-align: center;

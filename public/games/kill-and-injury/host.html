@@ -67,6 +67,9 @@
 
     .boards { display: flex; gap: 20px; width: 100%; }
     .board { flex: 1; min-width: 0; }
+    /* Below ~720px (phone, or iPad in Split View) two boards can't fit side by
+       side without the kills/injuries columns clipping — stack them instead. */
+    @media (max-width: 720px) { .boards { flex-direction: column; } }
     .board-head {
       display: flex; align-items: center; justify-content: space-between;
       padding: 10px 14px; border-radius: 14px 14px 0 0;
