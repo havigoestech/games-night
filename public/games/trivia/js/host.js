@@ -55,12 +55,7 @@ function renderPlaylist() {
     const card = document.createElement('div');
     card.className = 'trv-round-card';
     let fields;
-    if (r.mode === 'same-letter') {
-      fields = `
-        <div><label>Prompts</label><input type="number" data-f="count" data-i="${i}" min="1" max="12" value="${r.count}"></div>
-        <div><label>Seconds each</label><select data-f="seconds" data-i="${i}">${secondsOptions(r, [45, 60, 90, 120])}</select></div>
-        <div style="grid-column:1/-1;font-size:0.72rem;color:var(--text-muted)">Random category + letter each prompt. Type as many as you can — duplicates cancel.</div>`;
-    } else {
+    if (r.mode === 'fastest-finger') {
       const catOpts = ['<option value="any">Any category</option>'].concat(categories.map(c => `<option value="${escapeHtml(c)}"${r.category === c ? ' selected' : ''}>${escapeHtml(c)}</option>`)).join('');
       fields = `
         <div><label>Category</label><select data-f="category" data-i="${i}">${catOpts}</select></div>
@@ -71,6 +66,14 @@ function renderPlaylist() {
           <option value="hard"${r.difficulty === 'hard' ? ' selected' : ''}>Hard</option></select></div>
         <div><label>Questions</label><input type="number" data-f="count" data-i="${i}" min="1" max="20" value="${r.count}"></div>
         <div><label>Seconds each</label><select data-f="seconds" data-i="${i}">${secondsOptions(r, [10, 15, 20, 30])}</select></div>`;
+    } else {
+      const sl = r.mode === 'same-letter';
+      const note = sl ? 'Random category + letter each prompt. Type as many as you can — duplicates cancel.'
+                      : 'A numeric question each time — closest guess wins the most points.';
+      fields = `
+        <div><label>${sl ? 'Prompts' : 'Questions'}</label><input type="number" data-f="count" data-i="${i}" min="1" max="12" value="${r.count}"></div>
+        <div><label>Seconds each</label><select data-f="seconds" data-i="${i}">${secondsOptions(r, sl ? [45, 60, 90, 120] : [15, 20, 30, 45])}</select></div>
+        <div style="grid-column:1/-1;font-size:0.72rem;color:var(--text-muted)">${note}</div>`;
     }
     card.innerHTML = `
       <div class="trv-round-head">
@@ -170,7 +173,19 @@ function renderOptions(container, options, opts = {}) {
     container.appendChild(div);
   });
 }
-socket.on('question', (d) => { if (d.mode === 'same-letter') showSLQuestion(d); else showFFQuestion(d); });
+socket.on('question', (d) => {
+  if (d.mode === 'same-letter') showSLQuestion(d);
+  else if (d.mode === 'closest-wins') showCWQuestion(d);
+  else showFFQuestion(d);
+});
+function showCWQuestion(d) {
+  Sounds.wordReveal();
+  document.getElementById('q-cw-num').textContent = `Question ${d.qNumber} of ${d.qCount}`;
+  document.getElementById('q-cw-question').textContent = d.question + (d.unit ? ` (${d.unit})` : '');
+  const t = document.getElementById('q-cw-timer'); t.textContent = d.seconds; t.classList.remove('low');
+  document.getElementById('q-cw-progress').textContent = 'Players are guessing…';
+  showScreen('screen-question-cw');
+}
 function showFFQuestion(d) {
   Sounds.wordReveal();
   document.getElementById('q-cat').textContent = d.category || '';
@@ -190,18 +205,24 @@ function showSLQuestion(d) {
   showScreen('screen-question-sl');
 }
 socket.on('timer', ({ secondsLeft }) => {
-  ['q-timer', 'q-sl-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
+  ['q-timer', 'q-sl-timer', 'q-cw-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
   if (secondsLeft <= 5 && secondsLeft > 0) Sounds.tick();
 });
 socket.on('answer-progress', ({ answered, total }) => {
   const ff = document.getElementById('q-progress'); if (ff) ff.textContent = `${answered} / ${total} answered`;
   const sl = document.getElementById('q-sl-progress'); if (sl) sl.textContent = `${answered} of ${total} players answering…`;
+  const cw = document.getElementById('q-cw-progress'); if (cw) cw.textContent = `${answered} of ${total} players guessing…`;
 });
 document.getElementById('btn-reveal').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-reveal-sl').addEventListener('click', () => socket.emit('advance'));
+document.getElementById('btn-reveal-cw').addEventListener('click', () => socket.emit('advance'));
 
 // ── Reveal ──
-socket.on('question-reveal', (d) => { if (d.mode === 'same-letter') showSLReveal(d); else showFFReveal(d); });
+socket.on('question-reveal', (d) => {
+  if (d.mode === 'same-letter') showSLReveal(d);
+  else if (d.mode === 'closest-wins') showCWReveal(d);
+  else showFFReveal(d);
+});
 function showFFReveal(d) {
   Sounds.pointAwarded();
   const top = (d.results || []).find(r => r.correct);
@@ -227,8 +248,25 @@ function showSLReveal(d) {
   renderScoreCards('reveal-sl-scores', d.scores);
   showScreen('screen-reveal-sl');
 }
+function showCWReveal(d) {
+  Sounds.pointAwarded();
+  document.getElementById('reveal-cw-q').textContent = d.question;
+  document.getElementById('reveal-cw-answer').textContent = `${d.answer}${d.unit ? ' ' + d.unit : ''}`;
+  const box = document.getElementById('reveal-cw-guesses'); box.innerHTML = '';
+  (d.results || []).forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'cw-guess-row' + (i === 0 ? ' closest' : '');
+    row.innerHTML = `<span class="cw-guess-name">${i === 0 ? '🎯 ' : ''}${escapeHtml(r.name)}</span><span class="cw-guess-val">${r.value}</span><span class="cw-guess-pts">+${r.points}</span>`;
+    box.appendChild(row);
+  });
+  if (!(d.results || []).length) box.innerHTML = '<div style="color:var(--text-muted)">No guesses this round!</div>';
+  currentScores = d.scores;
+  renderScoreCards('reveal-cw-scores', d.scores);
+  showScreen('screen-reveal-cw');
+}
 document.getElementById('btn-next').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-next-sl').addEventListener('click', () => socket.emit('advance'));
+document.getElementById('btn-next-cw').addEventListener('click', () => socket.emit('advance'));
 
 // ── Round over ──
 socket.on('round-over', (d) => {

@@ -68,6 +68,16 @@
     .sl-chip.cancelled { background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.12); color:var(--text-muted); }
     .sl-chip.cancelled .txt { text-decoration:line-through; }
     .sl-chip .who { font-weight:600; font-size:0.78rem; opacity:0.7; margin-left:6px; }
+
+    /* Closest Wins */
+    .cw-question { font-family:'Fredoka',sans-serif; font-size:clamp(1.3rem,3.5vw,1.9rem); font-weight:700; text-align:center; line-height:1.3; }
+    .cw-answer { font-family:'Fredoka',sans-serif; font-size:3.5rem; font-weight:700; color:#FFD60A; line-height:1; }
+    .cw-guesses { display:flex; flex-direction:column; gap:6px; width:100%; max-width:480px; max-height:300px; overflow-y:auto; }
+    .cw-guess-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); }
+    .cw-guess-row.closest { border-color:#34C759; background:rgba(52,199,89,0.15); }
+    .cw-guess-name { flex:1; font-weight:700; text-align:left; }
+    .cw-guess-val { font-family:'Fredoka',sans-serif; font-weight:700; }
+    .cw-guess-pts { font-family:'Fredoka',sans-serif; font-weight:700; color:#FFD60A; min-width:56px; text-align:right; }
   </style>
 </head>
 <body>
@@ -178,6 +188,28 @@
       <div class="sl-groups" id="reveal-sl-groups"></div>
       <div style="width:100%"><div class="section-label mb-8" style="text-align:left">Scores</div><div class="score-grid" id="reveal-sl-scores"></div></div>
       <button class="btn btn-reveal mt-8" id="btn-next-sl" style="max-width:320px">Next →</button>
+    </div>
+  </div>
+
+  <!-- QUESTION (Closest Wins) -->
+  <div id="screen-question-cw" class="screen col center gap-0">
+    <div class="trv-game-inner">
+      <div class="trv-qmeta"><span id="q-cw-num"></span></div>
+      <div class="trv-timer" id="q-cw-timer">30</div>
+      <div class="cw-question" id="q-cw-question"></div>
+      <div class="trv-progress" id="q-cw-progress">Players are guessing…</div>
+      <button class="btn btn-ghost" id="btn-reveal-cw" style="max-width:320px">Reveal answer →</button>
+    </div>
+  </div>
+
+  <!-- REVEAL (Closest Wins) -->
+  <div id="screen-reveal-cw" class="screen col center gap-0">
+    <div class="trv-game-inner">
+      <div class="trv-qmeta" id="reveal-cw-q"></div>
+      <div class="cw-answer" id="reveal-cw-answer"></div>
+      <div class="cw-guesses" id="reveal-cw-guesses"></div>
+      <div style="width:100%"><div class="section-label mb-8" style="text-align:left">Scores</div><div class="score-grid" id="reveal-cw-scores"></div></div>
+      <button class="btn btn-reveal mt-8" id="btn-next-cw" style="max-width:320px">Next →</button>
     </div>
   </div>
 

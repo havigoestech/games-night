@@ -14,7 +14,7 @@ const playerId = (() => {
 let myTeamIndex = -1, myTeamColor = '#5856D6', teamNames = [], teamColors = [];
 let joinedRoomCode = null, pendingName = '', pendingRoom = '';
 let answered = false, myChoice = null, currentOptions = [];
-let slAnswers = [], slLetter = '';
+let slAnswers = [], slLetter = '', curMode = '';
 
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); const el = document.getElementById(id); if (el) el.classList.add('active'); }
@@ -94,19 +94,48 @@ function choose(i) {
   const lb = document.getElementById('p-locked'); lb.style.display = 'block'; lb.textContent = `Locked in: ${LETTERS[i]} — nice!`;
 }
 socket.on('you-submitted', (ack) => {
-  if (!ack || !('accepted' in ack)) return;           // Fastest Finger ack — nothing to show
-  const fb = document.getElementById('p-sl-feedback');
-  if (ack.accepted) { slAnswers = ack.yourAnswers || slAnswers; fb.textContent = ''; renderSLList(); Sounds.pointAwarded(); }
-  else {
-    if (ack.reason === 'letter') fb.textContent = `Must start with ${ack.letter} 🙂`;
-    else if (ack.reason === 'dup') fb.textContent = 'You already got that one!';
-    else fb.textContent = 'Try again…';
-    Sounds.noPoint();
+  if (curMode === 'same-letter') {
+    if (!ack || !('accepted' in ack)) return;
+    const fb = document.getElementById('p-sl-feedback');
+    if (ack.accepted) { slAnswers = ack.yourAnswers || slAnswers; fb.textContent = ''; renderSLList(); Sounds.pointAwarded(); }
+    else {
+      if (ack.reason === 'letter') fb.textContent = `Must start with ${ack.letter} 🙂`;
+      else if (ack.reason === 'dup') fb.textContent = 'You already got that one!';
+      else fb.textContent = 'Try again…';
+      Sounds.noPoint();
+    }
+  } else if (curMode === 'closest-wins') {
+    const el = document.getElementById('p-cw-your');
+    if (ack && ack.accepted) { el.textContent = `Your guess: ${ack.value} ✓`; Sounds.pointAwarded(); }
+    else el.textContent = 'Enter a number!';
   }
+  // Fastest Finger: nothing to show
 });
 
-socket.on('question', (d) => { if (d.mode === 'same-letter') showSLQuestion(d); else showFFQuestion(d); });
+socket.on('question', (d) => {
+  if (d.mode === 'same-letter') showSLQuestion(d);
+  else if (d.mode === 'closest-wins') showCWQuestion(d);
+  else showFFQuestion(d);
+});
+function showCWQuestion(d) {
+  curMode = 'closest-wins';
+  document.getElementById('p-cw-meta').textContent = `Question ${d.qNumber} of ${d.qCount}`;
+  document.getElementById('p-cw-question').textContent = d.question + (d.unit ? ` (${d.unit})` : '');
+  document.getElementById('p-cw-timer').textContent = d.seconds != null ? d.seconds : '';
+  document.getElementById('p-cw-input').value = '';
+  document.getElementById('p-cw-your').textContent = '';
+  showScreen('screen-question-cw');
+  setTimeout(() => { const el = document.getElementById('p-cw-input'); if (el) el.focus(); }, 60);
+}
+function cwSubmit() {
+  const inp = document.getElementById('p-cw-input'); const v = inp.value.trim();
+  if (v === '') return;
+  socket.emit('submit', { value: v });
+}
+document.getElementById('p-cw-add').addEventListener('click', cwSubmit);
+document.getElementById('p-cw-input').addEventListener('keydown', e => { if (e.key === 'Enter') cwSubmit(); });
 function showFFQuestion(d) {
+  curMode = 'fastest-finger';
   answered = false; myChoice = null;
   document.getElementById('p-qmeta').textContent = `${d.category || ''} · Q${d.qNumber} of ${d.qCount}`;
   document.getElementById('p-question').textContent = d.question;
@@ -115,7 +144,7 @@ function showFFQuestion(d) {
   showScreen('screen-question');
 }
 function showSLQuestion(d) {
-  slAnswers = []; slLetter = d.letter;
+  curMode = 'same-letter'; slAnswers = []; slLetter = d.letter;
   document.getElementById('p-sl-meta').textContent = `Prompt ${d.qNumber} of ${d.qCount}`;
   document.getElementById('p-sl-letter').textContent = d.letter;
   document.getElementById('p-sl-cat').textContent = `${d.category} starting with “${d.letter}”`;
@@ -138,9 +167,25 @@ function slSubmit() {
 }
 document.getElementById('p-sl-add').addEventListener('click', slSubmit);
 document.getElementById('p-sl-input').addEventListener('keydown', e => { if (e.key === 'Enter') slSubmit(); });
-socket.on('timer', ({ secondsLeft }) => { const t = document.getElementById('p-sl-timer'); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
+socket.on('timer', ({ secondsLeft }) => {
+  ['p-sl-timer', 'p-cw-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
+});
 
-socket.on('question-reveal', (d) => { if (d.mode === 'same-letter') showSLReveal(d, slAnswers); else showFFReveal(d); });
+socket.on('question-reveal', (d) => {
+  if (d.mode === 'same-letter') showSLReveal(d, slAnswers);
+  else if (d.mode === 'closest-wins') showCWReveal(d);
+  else showFFReveal(d);
+});
+function showCWReveal(d) {
+  const mine = (d.results || []).find(r => r.playerId === playerId);
+  document.getElementById('p-cw-answer').textContent = `${d.answer}${d.unit ? ' ' + d.unit : ''}`;
+  const res = document.getElementById('p-cw-result');
+  if (mine) { res.textContent = `You guessed ${mine.value} · +${mine.points}`; res.className = 'p-result ' + (mine.points >= 500 ? 'win' : (mine.points > 0 ? '' : 'lose')); }
+  else { res.textContent = 'No guess this time'; res.className = 'p-result lose'; }
+  (mine && mine.points > 0) ? Sounds.pointAwarded() : Sounds.noPoint();
+  renderScoreCards('p-cw-scores', d.scores);
+  showScreen('screen-reveal-cw');
+}
 function showFFReveal(d) {
   const mine = (d.results || []).find(r => r.playerId === playerId);
   const res = document.getElementById('p-result');
@@ -183,6 +228,9 @@ function applySnapshot(s) {
         showSLQuestion({ ...s.question, qNumber: s.qNumber, qCount: s.qCount, seconds: s.secondsLeft });
         slAnswers = (s.you && s.you.answers) || [];
         renderSLList();
+      } else if (s.question && s.question.mode === 'closest-wins') {
+        showCWQuestion({ ...s.question, qNumber: s.qNumber, qCount: s.qCount, seconds: s.secondsLeft });
+        if (s.you && s.you.value != null) { document.getElementById('p-cw-input').value = s.you.value; document.getElementById('p-cw-your').textContent = `Your guess: ${s.you.value} ✓`; }
       } else {
         answered = !!(s.you && s.you.answered);
         myChoice = s.you ? s.you.choice : null;
@@ -199,6 +247,8 @@ function applySnapshot(s) {
     case 'question-reveal': {
       if (s.reveal && s.reveal.mode === 'same-letter') {
         showSLReveal(s.reveal, (s.you && s.you.answers) || slAnswers);
+      } else if (s.reveal && s.reveal.mode === 'closest-wins') {
+        showCWReveal(s.reveal);
       } else if (s.reveal) {
         const mine = (s.reveal.results || []).find(r => r.playerId === playerId);
         const res = document.getElementById('p-result');

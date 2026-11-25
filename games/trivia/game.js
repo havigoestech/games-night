@@ -11,6 +11,7 @@ const ROOM_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MODES = {
   'fastest-finger': require('./modes/fastest-finger'),
   'same-letter': require('./modes/same-letter'),
+  'closest-wins': require('./modes/closest-wins'),
 };
 
 const rooms = new Map();
