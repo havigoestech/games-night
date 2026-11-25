@@ -449,6 +449,22 @@
         <input type="checkbox" id="ff-clean-toggle" checked style="width:20px;height:20px;accent-color:#34C759;flex-shrink:0;cursor:pointer">
         <span style="font-size:0.95rem;font-weight:600">👨‍👩‍👧 Family-friendly — hide rude questions</span>
       </label>
+      <div>
+        <div class="section-label">Round Timers</div>
+        <div style="display:flex;gap:12px">
+          <label style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:0.8rem;font-weight:700;color:var(--text-muted);text-align:left">Face-off
+            <select id="ff-faceoff-secs" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:#fff;font-family:'Nunito',sans-serif;font-size:0.95rem;font-weight:600;padding:10px 12px;outline:none">
+              <option value="0">Off</option><option value="3">3s</option><option value="5" selected>5s</option><option value="8">8s</option><option value="10">10s</option>
+            </select>
+          </label>
+          <label style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:0.8rem;font-weight:700;color:var(--text-muted);text-align:left">Play / steal
+            <select id="ff-play-secs" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:#fff;font-family:'Nunito',sans-serif;font-size:0.95rem;font-weight:600;padding:10px 12px;outline:none">
+              <option value="0">Off</option><option value="8">8s</option><option value="10" selected>10s</option><option value="15">15s</option><option value="20">20s</option><option value="30">30s</option>
+            </select>
+          </label>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;text-align:left">When a timer runs out: face-off counts a miss, play counts a strike.</div>
+      </div>
       <button class="btn btn-reveal mt-8" id="btn-create">Create Room</button>
       <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
     </div>
@@ -497,6 +513,12 @@
 
       <!-- Round pot -->
       <div id="ff-pot">Round pot: 0</div>
+
+      <!-- Round timer (face-off / play — configurable, auto-counts on expiry) -->
+      <div id="ff-timer" style="display:none;font-family:'Fredoka',sans-serif;font-weight:700;border-radius:14px;padding:8px 22px;margin:6px 0;min-width:140px;text-align:center;border:2px solid">
+        <span id="ff-timer-kind" style="display:block;font-family:'Nunito',sans-serif;font-size:0.62rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;opacity:0.75"></span>
+        <span id="ff-timer-num" style="font-size:2.1rem;line-height:1.1">5</span>
+      </div>
 
       <!-- Phase status: who buzzed / whose counter / play-or-pass / steal -->
       <div id="ff-status">

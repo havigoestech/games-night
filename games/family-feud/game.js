@@ -72,6 +72,10 @@ function snapshot(room) {
     })),
     pot: room.pot,
     strikes: room.strikes,
+    secondsLeft: room.secondsLeft ?? null,
+    timerKind: room.timerKind ?? null,
+    faceoffSeconds: room.faceoffSeconds ?? 5,
+    playSeconds: room.playSeconds ?? 10,
     scores: getScores(room),
     teamNames: room.teams.map(t => t.name),
     teamColors: room.teams.map(t => t.color),
@@ -150,6 +154,8 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
     const winner = winnerTeamIndex != null ? room.teams[winnerTeamIndex] : null;
     if (winner) winner.score += room.pot;
     room.phase = 'round-over';
+    clearFeudTimer(room);
+    emitTimer(room, null, null, 0);
     room.lastRoundResult = {
       winnerTeamIndex: winnerTeamIndex ?? null,
       winnerTeamName: winner?.name ?? null,
@@ -181,6 +187,8 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
     if (room.concluded) return;
     room.concluded = true;
     room.phase = 'game-over';
+    clearFeudTimer(room);
+    emitTimer(room, null, null, 0);
     const scores = getScores(room).sort((a, b) => b.score - a.score);
     namespace.to(room.roomCode).emit('game-over', { scores });
     if (room.tournament && typeof room.onComplete === 'function') {
@@ -188,9 +196,124 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
     }
   }
 
+  // ── Round timers ────────────────────────────────────────────────
+  // A server-authoritative countdown, mirrored on the room so a reconnect
+  // replays a live clock. Face-off answering windows use the face-off timer;
+  // the playing / stealing team uses the play timer; every other phase has no
+  // clock. When a timer runs out it AUTO-COUNTS as a miss / strike (applyWrong).
+  function emitTimer(room, secondsLeft, kind, total) {
+    namespace.to(room.roomCode).emit('feud-timer', { secondsLeft, kind: kind || null, total: total || 0 });
+  }
+  function clearFeudTimer(room) {
+    if (room.feudTimer) { clearInterval(room.feudTimer); room.feudTimer = null; }
+    room.secondsLeft = null;
+    room.timerKind = null;
+  }
+  function startFeudTimer(room, kind, seconds, onExpire) {
+    clearFeudTimer(room);
+    if (!(seconds > 0)) { emitTimer(room, null, null, 0); return; }   // timer turned off
+    room.secondsLeft = seconds;
+    room.timerKind = kind;
+    emitTimer(room, seconds, kind, seconds);
+    room.feudTimer = setInterval(() => {
+      room.secondsLeft--;
+      emitTimer(room, room.secondsLeft, kind, seconds);
+      if (room.secondsLeft <= 0) {
+        clearFeudTimer(room);
+        try { onExpire && onExpire(); } catch (e) { console.error('[family-feud] timer expiry error:', e.message); }
+      }
+    }, 1000);
+  }
+  function syncFeudTimer(room) {
+    const kind = (room.phase === 'faceoff-judging' || room.phase === 'faceoff-counter') ? 'faceoff'
+               : (room.phase === 'team-play' || room.phase === 'steal') ? 'play'
+               : null;
+    if (!kind) { clearFeudTimer(room); emitTimer(room, null, null, 0); return; }
+    const seconds = kind === 'faceoff' ? room.faceoffSeconds : room.playSeconds;
+    startFeudTimer(room, kind, seconds, () => { applyWrong(room); syncFeudTimer(room); });
+  }
+
+  // "That answer wasn't on the board" — factored out of the host-wrong handler
+  // so BOTH the host's button and a timer running out can trigger it.
+  function applyWrong(room) {
+    switch (room.phase) {
+      case 'faceoff-judging': {
+        // Face-off miss — no strike; the other team gets a counter.
+        const bt = room.faceoff.buzzer.teamIndex;
+        room.faceoff.firstAnswer = { teamIndex: bt, answerIndex: null };
+        room.faceoff.counterTeamIndex = 1 - bt;
+        room.phase = 'faceoff-counter';
+        const bTeam = room.teams[bt];
+        const cTeam = room.teams[room.faceoff.counterTeamIndex];
+        namespace.to(room.roomCode).emit('faceoff-miss', {
+          teamIndex: bt, teamName: bTeam.name, isCounter: false, reopen: false
+        });
+        namespace.to(room.roomCode).emit('faceoff-counter', {
+          counterTeamIndex: room.faceoff.counterTeamIndex,
+          counterTeamName: cTeam.name,
+          counterTeamColor: cTeam.color,
+          firstAnswer: room.faceoff.firstAnswer
+        });
+        break;
+      }
+      case 'faceoff-counter': {
+        const ct = room.faceoff.counterTeamIndex;
+        const cTeam = room.teams[ct];
+        const fa = room.faceoff.firstAnswer;
+        if (fa.answerIndex !== null) {
+          // Counter missed but the first team had an answer on the board → first wins.
+          namespace.to(room.roomCode).emit('faceoff-miss', {
+            teamIndex: ct, teamName: cTeam.name, isCounter: true, reopen: false
+          });
+          faceoffWon(room, fa.teamIndex);
+        } else if (!room.faceoffReopened) {
+          // Both sides missed — reopen the buzzers ONCE for a fresh buzz-in.
+          room.faceoffReopened = true;
+          namespace.to(room.roomCode).emit('faceoff-miss', {
+            teamIndex: ct, teamName: cTeam.name, isCounter: true, reopen: true
+          });
+          resetFaceoff(room);
+          room.phase = 'faceoff';
+          namespace.to(room.roomCode).emit('faceoff-open', { rebuzz: true });
+        } else {
+          // Both missed AGAIN — no endless loop. The team that buzzed in first
+          // this question takes the face-off and chooses play or pass.
+          const winner = (typeof room.firstBuzzTeamIndex === 'number') ? room.firstBuzzTeamIndex : ct;
+          namespace.to(room.roomCode).emit('faceoff-miss', {
+            teamIndex: ct, teamName: cTeam.name, isCounter: true, reopen: false
+          });
+          faceoffWon(room, winner);
+        }
+        break;
+      }
+      case 'team-play': {
+        room.strikes++;
+        namespace.to(room.roomCode).emit('wrong-answer', { strikes: room.strikes });
+        if (room.strikes >= 3) {
+          room.stealTeamIndex = 1 - room.controllingTeamIndex;
+          room.phase = 'steal';
+          const stealTeam = room.teams[room.stealTeamIndex];
+          namespace.to(room.roomCode).emit('steal-mode', {
+            stealTeamIndex: room.stealTeamIndex,
+            stealTeamName: stealTeam.name,
+            stealTeamColor: stealTeam.color,
+            pot: room.pot
+          });
+        }
+        break;
+      }
+      case 'steal': {
+        // Steal failed — the playing team keeps the pot.
+        endRound(room, room.controllingTeamIndex, 'steal-failed');
+        break;
+      }
+      default: return;
+    }
+  }
+
   namespace.on('connection', (socket) => {
 
-    socket.on('create-room', ({ teamNames, baseUrl, familyFriendly = true }) => {
+    socket.on('create-room', ({ teamNames, baseUrl, familyFriendly = true, faceoffSeconds, playSeconds }) => {
       try {
         console.log('[family-feud] create-room from', socket.id);
         // Family Feud is a head-to-head game — always exactly 2 teams.
@@ -199,6 +322,10 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
           color: TEAM_COLORS[i],
           score: 0
         }));
+
+        // Round timers (0 = off). Defaults: 5s face-off, 10s play.
+        const foSecs = [0, 3, 5, 8, 10].includes(parseInt(faceoffSeconds)) ? parseInt(faceoffSeconds) : 5;
+        const plSecs = [0, 8, 10, 15, 20, 30].includes(parseInt(playSeconds)) ? parseInt(playSeconds) : 10;
 
         const roomCode = generateRoomCode();
         const room = {
@@ -216,6 +343,13 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
           strikes: 0,
           revealed: [],
           buzzLocked: false,
+          firstBuzzTeamIndex: null,
+          faceoffReopened: false,
+          faceoffSeconds: foSecs,
+          playSeconds: plSecs,
+          feudTimer: null,
+          secondsLeft: null,
+          timerKind: null,
           faceoff: { buzzer: null, firstAnswer: null, counterTeamIndex: null },
           faceoffWinnerTeamIndex: null,
           controllingTeamIndex: null,
@@ -374,6 +508,8 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
       room.controllingTeamIndex = null;
       room.stealTeamIndex = null;
       room.lastRoundResult = null;
+      room.firstBuzzTeamIndex = null;
+      room.faceoffReopened = false;
       resetFaceoff(room);
       room.phase = 'faceoff';
 
@@ -391,6 +527,7 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
       namespace.to(room.roomCode).except(room.hostSocketId).emit('question-start', common);
 
       namespace.to(room.roomCode).emit('faceoff-open', { rebuzz: false });
+      syncFeudTimer(room);
     });
 
     // Player: buzz during the face-off — open to EVERY player on both teams.
@@ -402,6 +539,7 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
 
       room.buzzLocked = true;
       room.phase = 'faceoff-judging';
+      if (typeof room.firstBuzzTeamIndex !== 'number') room.firstBuzzTeamIndex = socket.teamIndex;
       room.faceoff.buzzer = {
         socketId: socket.id,
         playerId: socket.playerId,
@@ -417,6 +555,7 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
         teamName: team.name,
         teamColor: team.color
       });
+      syncFeudTimer(room);
     });
 
     // Host: a spoken answer matched the board — phase decides what it means.
@@ -478,77 +617,16 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
         // Blocked in faceoff (no attribution yet), play-or-pass, lobby, game-over.
         default: return;
       }
+      syncFeudTimer(room);
     });
 
-    // Host: the spoken answer was not on the board — phase decides what it means.
+    // Host: the spoken answer was not on the board. The actual miss/strike logic
+    // lives in applyWrong so a timer running out triggers the exact same thing.
     socket.on('host-wrong', () => {
       const room = rooms.get(socket.roomCode);
       if (!room || !socket.isHost) return;
-
-      switch (room.phase) {
-        case 'faceoff-judging': {
-          // Face-off miss — no strike; the other team gets a counter.
-          const bt = room.faceoff.buzzer.teamIndex;
-          room.faceoff.firstAnswer = { teamIndex: bt, answerIndex: null };
-          room.faceoff.counterTeamIndex = 1 - bt;
-          room.phase = 'faceoff-counter';
-          const bTeam = room.teams[bt];
-          const cTeam = room.teams[room.faceoff.counterTeamIndex];
-          namespace.to(room.roomCode).emit('faceoff-miss', {
-            teamIndex: bt, teamName: bTeam.name, isCounter: false, reopen: false
-          });
-          namespace.to(room.roomCode).emit('faceoff-counter', {
-            counterTeamIndex: room.faceoff.counterTeamIndex,
-            counterTeamName: cTeam.name,
-            counterTeamColor: cTeam.color,
-            firstAnswer: room.faceoff.firstAnswer
-          });
-          break;
-        }
-        case 'faceoff-counter': {
-          const ct = room.faceoff.counterTeamIndex;
-          const cTeam = room.teams[ct];
-          const fa = room.faceoff.firstAnswer;
-          if (fa.answerIndex !== null) {
-            // Counter missed but the first team had an answer on the board.
-            namespace.to(room.roomCode).emit('faceoff-miss', {
-              teamIndex: ct, teamName: cTeam.name, isCounter: true, reopen: false
-            });
-            faceoffWon(room, fa.teamIndex);
-          } else {
-            // Both sides missed — reopen the buzzers for a fresh face-off.
-            namespace.to(room.roomCode).emit('faceoff-miss', {
-              teamIndex: ct, teamName: cTeam.name, isCounter: true, reopen: true
-            });
-            resetFaceoff(room);
-            room.phase = 'faceoff';
-            namespace.to(room.roomCode).emit('faceoff-open', { rebuzz: true });
-          }
-          break;
-        }
-        case 'team-play': {
-          room.strikes++;
-          namespace.to(room.roomCode).emit('wrong-answer', { strikes: room.strikes });
-          if (room.strikes >= 3) {
-            room.stealTeamIndex = 1 - room.controllingTeamIndex;
-            room.phase = 'steal';
-            const stealTeam = room.teams[room.stealTeamIndex];
-            namespace.to(room.roomCode).emit('steal-mode', {
-              stealTeamIndex: room.stealTeamIndex,
-              stealTeamName: stealTeam.name,
-              stealTeamColor: stealTeam.color,
-              pot: room.pot
-            });
-          }
-          break;
-        }
-        case 'steal': {
-          // Steal failed — the playing team keeps the pot.
-          endRound(room, room.controllingTeamIndex, 'steal-failed');
-          break;
-        }
-        default: return;
-      }
+      applyWrong(room);
+      syncFeudTimer(room);
     });
 
     // Host: face-off winner's choice — play the board or pass it over.
@@ -569,6 +647,7 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
         teamColor: team.color,
         choice
       });
+      syncFeudTimer(room);
     });
 
     // Host: escape hatch. Mid-face-off the round is scrapped (no winner, pot
@@ -615,6 +694,7 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
       const room = rooms.get(roomCode);
       if (!room) return;
       if (socket.isHost) {
+        clearFeudTimer(room);
         namespace.to(roomCode).emit('host-disconnected', {});
         rooms.delete(roomCode);
       } else {
@@ -630,12 +710,15 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
   });
 
   // ── Tournament integration (gated by room.tournament) ───────
-  orchestrator.register('family-feud', ({ roster, teams, length, onComplete }) => {
+  orchestrator.register('family-feud', ({ roster, teams, config, length, onComplete }) => {
     const roomCode = generateRoomCode();
     const builtTeams = (teams || []).slice(0, 2).map((t, i) => ({
       name: t.name, color: t.color || TEAM_COLORS[i], score: 0
     }));
     while (builtTeams.length < 2) builtTeams.push({ name: `Team ${builtTeams.length + 1}`, color: TEAM_COLORS[builtTeams.length], score: 0 });
+
+    const foSecs = [0, 3, 5, 8, 10].includes(parseInt(config && config.faceoffSeconds)) ? parseInt(config.faceoffSeconds) : 5;
+    const plSecs = [0, 8, 10, 15, 20, 30].includes(parseInt(config && config.playSeconds)) ? parseInt(config.playSeconds) : 10;
 
     const room = {
       roomCode,
@@ -652,6 +735,13 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
       strikes: 0,
       revealed: [],
       buzzLocked: false,
+      firstBuzzTeamIndex: null,
+      faceoffReopened: false,
+      faceoffSeconds: foSecs,
+      playSeconds: plSecs,
+      feudTimer: null,
+      secondsLeft: null,
+      timerKind: null,
       faceoff: { buzzer: null, firstAnswer: null, counterTeamIndex: null },
       faceoffWinnerTeamIndex: null,
       controllingTeamIndex: null,

@@ -63,6 +63,20 @@ socket.on('watch-error', ({ message }) => {
 socket.on('sync', applySnapshot);
 socket.on('host-disconnected', () => showScreen('screen-host-gone'));
 
+socket.on('feud-timer', ({ secondsLeft, kind }) => {
+  const el = document.getElementById('ff-timer');
+  if (!el) return;
+  if (secondsLeft == null || !kind) { el.style.display = 'none'; return; }
+  const color = secondsLeft <= 3 ? '#FF2D55' : (secondsLeft <= 5 ? '#FF9500' : '#34C759');
+  el.style.display = '';
+  el.style.color = color; el.style.borderColor = color; el.style.background = color + '22';
+  const k = document.getElementById('ff-timer-kind');
+  const n = document.getElementById('ff-timer-num');
+  if (k) k.textContent = kind === 'play' ? 'Answer' : 'Face-off';
+  if (n) n.textContent = secondsLeft;
+  if (typeof Sounds !== 'undefined' && typeof Sounds.tick === 'function' && secondsLeft > 0 && secondsLeft <= 3) Sounds.tick(secondsLeft <= 2);
+});
+
 // ── Team bar ──
 function renderTeamsBar() {
   const bar = document.getElementById('ff-teams-bar');

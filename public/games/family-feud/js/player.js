@@ -429,6 +429,19 @@ socket.on('wrong-answer', ({ strikes }) => {
   renderStrikes(strikes);
 });
 
+socket.on('feud-timer', ({ secondsLeft, kind }) => {
+  const el = document.getElementById('player-timer');
+  if (!el) return;
+  if (secondsLeft == null || !kind) { el.style.display = 'none'; return; }
+  const color = secondsLeft <= 3 ? '#FF2D55' : (secondsLeft <= 5 ? '#FF9500' : '#34C759');
+  el.style.display = '';
+  el.style.color = color; el.style.borderColor = color; el.style.background = '#14142b';
+  const k = document.getElementById('player-timer-kind');
+  const n = document.getElementById('player-timer-num');
+  if (k) k.textContent = kind === 'play' ? 'Answer' : 'Face-off';
+  if (n) n.textContent = secondsLeft;
+});
+
 socket.on('steal-mode', ({ stealTeamIndex, pot }) => {
   Sounds.timeUp();
   setPot(pot);

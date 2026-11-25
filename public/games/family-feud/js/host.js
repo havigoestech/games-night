@@ -64,7 +64,9 @@ document.getElementById('btn-create').addEventListener('click', () => {
     return el ? el.value.trim() : '';
   });
   const familyFriendly = document.getElementById('ff-clean-toggle').checked;
-  socket.emit('create-room', { teamNames, familyFriendly, baseUrl: `${location.protocol}//${location.host}` });
+  const faceoffSeconds = parseInt((document.getElementById('ff-faceoff-secs') || {}).value);
+  const playSeconds = parseInt((document.getElementById('ff-play-secs') || {}).value);
+  socket.emit('create-room', { teamNames, familyFriendly, faceoffSeconds, playSeconds, baseUrl: `${location.protocol}//${location.host}` });
 
   setTimeout(() => { btn.textContent = 'Create Room'; btn.disabled = false; dbg(''); }, 8000);
 });
@@ -437,6 +439,23 @@ socket.on('wrong-answer', ({ strikes }) => {
 
 socket.on('faceoff-miss', () => {
   Sounds.noPoint();
+});
+
+// ── Round timer (face-off / play) ──────────────────────────────
+socket.on('feud-timer', ({ secondsLeft, kind }) => {
+  const el = document.getElementById('ff-timer');
+  if (!el) return;
+  if (secondsLeft == null || !kind) { el.style.display = 'none'; return; }
+  const color = secondsLeft <= 3 ? '#FF2D55' : (secondsLeft <= 5 ? '#FF9500' : '#34C759');
+  el.style.display = '';
+  el.style.color = color;
+  el.style.borderColor = color;
+  el.style.background = color + '22';
+  const k = document.getElementById('ff-timer-kind');
+  const n = document.getElementById('ff-timer-num');
+  if (k) k.textContent = kind === 'play' ? 'Answer — strike if it runs out' : 'Face-off';
+  if (n) n.textContent = secondsLeft;
+  if (typeof Sounds.tick === 'function' && secondsLeft > 0 && secondsLeft <= 3) Sounds.tick(secondsLeft <= 2);
 });
 
 socket.on('steal-mode', ({ stealTeamIndex: st, stealTeamName, stealTeamColor, pot: p }) => {

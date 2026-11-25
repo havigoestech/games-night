@@ -65,7 +65,9 @@ async function main() {
     console.log('\n── 1: Setup — 2-team lock, roster ──');
     const host = track(conn());
     await once(host, 'connect');
-    host.emit('create-room', { teamCount: 5, teamNames: ['Alpha', 'Beta'] });
+    // Timers OFF here so this flow test is deterministic — the dedicated
+    // family-feud-timers test covers the countdowns and auto-count behaviour.
+    host.emit('create-room', { teamCount: 5, teamNames: ['Alpha', 'Beta'], faceoffSeconds: 0, playSeconds: 0 });
     const created = await once(host, 'room-created');
     const CODE = created.roomCode;
     ok(created.teams.length === 2, `room forces exactly 2 teams (asked for 5): ${CODE}`);

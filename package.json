@@ -8,6 +8,7 @@
     "dev": "DEV_TOOLS=1 node server.js",
     "test:ff": "node test/family-feud.test.js",
     "test:ff-data": "node test/family-feud-data.test.js",
+    "test:ff-timers": "node test/family-feud-timers.test.js",
     "test:trivia": "node test/trivia-fastest-finger.test.js",
     "test:trivia-data": "node test/trivia-data.test.js",
     "test:trivia-sl": "node test/trivia-same-letter.test.js",
