@@ -14,7 +14,7 @@ const playerId = (() => {
 let myTeamIndex = -1, myTeamColor = '#5856D6', teamNames = [], teamColors = [];
 let joinedRoomCode = null, pendingName = '', pendingRoom = '';
 let answered = false, myChoice = null, currentOptions = [];
-let slAnswers = [], slLetter = '', curMode = '';
+let slAnswers = [], slLetter = '', curMode = '', myBluff = '';
 
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); const el = document.getElementById(id); if (el) el.classList.add('active'); }
@@ -108,6 +108,15 @@ socket.on('you-submitted', (ack) => {
     const el = document.getElementById('p-cw-your');
     if (ack && ack.accepted) { el.textContent = `Your guess: ${ack.value} ✓`; Sounds.pointAwarded(); }
     else el.textContent = 'Enter a number!';
+  } else if (curMode === 'the-big-bluff') {
+    if (!ack) return;
+    if (ack.stage === 'bluff') {
+      if (ack.accepted) { myBluff = ack.text; document.getElementById('p-bb-your').textContent = `Your bluff: ${ack.text} ✓`; Sounds.pointAwarded(); }
+    } else {
+      const st = document.getElementById('p-vote-status');
+      if (ack.accepted) { markVoteChosen(ack.optionId); st.textContent = 'Vote locked in ✓'; Sounds.pointAwarded(); }
+      else if (ack.reason === 'own') st.textContent = "That's your own bluff! 😏";
+    }
   }
   // Fastest Finger: nothing to show
 });
@@ -115,8 +124,44 @@ socket.on('you-submitted', (ack) => {
 socket.on('question', (d) => {
   if (d.mode === 'same-letter') showSLQuestion(d);
   else if (d.mode === 'closest-wins') showCWQuestion(d);
+  else if (d.mode === 'the-big-bluff') showBBQuestion(d);
   else showFFQuestion(d);
 });
+function markVoteChosen(optId) {
+  document.querySelectorAll('#p-vote-options .bb-vote-opt').forEach(el => { el.classList.add('locked'); if (el.dataset.optid === optId) el.classList.add('chosen'); });
+}
+function showBBQuestion(d) {
+  curMode = 'the-big-bluff';
+  if (d.stage === 'vote') {
+    document.getElementById('p-vote-prompt').textContent = d.prompt;
+    document.getElementById('p-vote-timer').textContent = d.seconds != null ? d.seconds : '';
+    document.getElementById('p-vote-status').textContent = 'Tap the answer you think is TRUE';
+    const box = document.getElementById('p-vote-options'); box.innerHTML = '';
+    const nrm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const myNorm = nrm(myBluff);
+    (d.options || []).forEach(o => {
+      const el = document.createElement('div');
+      const isMine = myNorm && nrm(o.text) === myNorm;
+      el.className = 'bb-vote-opt' + (isMine ? ' mine' : '');
+      el.dataset.optid = o.id;
+      el.textContent = o.text + (isMine ? '  (your bluff)' : '');
+      if (!isMine) el.addEventListener('click', () => socket.emit('submit', { optionId: o.id }));
+      box.appendChild(el);
+    });
+    showScreen('screen-question-vote');
+  } else {
+    myBluff = '';
+    document.getElementById('p-bb-prompt').textContent = d.prompt;
+    document.getElementById('p-bb-timer').textContent = d.seconds != null ? d.seconds : '';
+    document.getElementById('p-bb-input').value = '';
+    document.getElementById('p-bb-your').textContent = '';
+    showScreen('screen-question-bluff');
+    setTimeout(() => { const el = document.getElementById('p-bb-input'); if (el) el.focus(); }, 60);
+  }
+}
+function bbSubmit() { const inp = document.getElementById('p-bb-input'); const v = inp.value.trim(); if (!v) return; socket.emit('submit', { answer: v }); }
+document.getElementById('p-bb-add').addEventListener('click', bbSubmit);
+document.getElementById('p-bb-input').addEventListener('keydown', e => { if (e.key === 'Enter') bbSubmit(); });
 function showCWQuestion(d) {
   curMode = 'closest-wins';
   document.getElementById('p-cw-meta').textContent = `Question ${d.qNumber} of ${d.qCount}`;
@@ -168,14 +213,29 @@ function slSubmit() {
 document.getElementById('p-sl-add').addEventListener('click', slSubmit);
 document.getElementById('p-sl-input').addEventListener('keydown', e => { if (e.key === 'Enter') slSubmit(); });
 socket.on('timer', ({ secondsLeft }) => {
-  ['p-sl-timer', 'p-cw-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
+  ['p-sl-timer', 'p-cw-timer', 'p-bb-timer', 'p-vote-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
 });
 
 socket.on('question-reveal', (d) => {
   if (d.mode === 'same-letter') showSLReveal(d, slAnswers);
   else if (d.mode === 'closest-wins') showCWReveal(d);
+  else if (d.mode === 'the-big-bluff') showBBReveal(d);
   else showFFReveal(d);
 });
+function showBBReveal(d) {
+  const mine = (d.results || []).find(r => r.playerId === playerId);
+  const res = document.getElementById('p-bb-result');
+  if (mine && mine.points > 0) {
+    const bits = [];
+    if (mine.foundTruth) bits.push('Found the truth!');
+    if (mine.fooled) bits.push(`Fooled ${mine.fooled}!`);
+    res.textContent = `${bits.join(' ')} +${mine.points}`;
+    res.className = 'p-result win'; Sounds.pointAwarded();
+  } else { res.textContent = 'Bluffed out — 0'; res.className = 'p-result lose'; Sounds.noPoint(); }
+  document.getElementById('p-bb-truth').textContent = d.truth;
+  renderScoreCards('p-bb-scores', d.scores);
+  showScreen('screen-reveal-bluff');
+}
 function showCWReveal(d) {
   const mine = (d.results || []).find(r => r.playerId === playerId);
   document.getElementById('p-cw-answer').textContent = `${d.answer}${d.unit ? ' ' + d.unit : ''}`;
@@ -231,6 +291,11 @@ function applySnapshot(s) {
       } else if (s.question && s.question.mode === 'closest-wins') {
         showCWQuestion({ ...s.question, qNumber: s.qNumber, qCount: s.qCount, seconds: s.secondsLeft });
         if (s.you && s.you.value != null) { document.getElementById('p-cw-input').value = s.you.value; document.getElementById('p-cw-your').textContent = `Your guess: ${s.you.value} ✓`; }
+      } else if (s.question && s.question.mode === 'the-big-bluff') {
+        if (s.you && s.you.stage === 'vote' && s.you.yourFake) myBluff = s.you.yourFake;
+        showBBQuestion({ ...s.question, qNumber: s.qNumber, qCount: s.qCount, seconds: s.secondsLeft });
+        if (s.you && s.you.stage === 'bluff' && s.you.fake) { myBluff = s.you.fake; document.getElementById('p-bb-input').value = s.you.fake; document.getElementById('p-bb-your').textContent = `Your bluff: ${s.you.fake} ✓`; }
+        else if (s.you && s.you.stage === 'vote' && s.you.vote) { markVoteChosen(s.you.vote); document.getElementById('p-vote-status').textContent = 'Vote locked in ✓'; }
       } else {
         answered = !!(s.you && s.you.answered);
         myChoice = s.you ? s.you.choice : null;
@@ -249,6 +314,8 @@ function applySnapshot(s) {
         showSLReveal(s.reveal, (s.you && s.you.answers) || slAnswers);
       } else if (s.reveal && s.reveal.mode === 'closest-wins') {
         showCWReveal(s.reveal);
+      } else if (s.reveal && s.reveal.mode === 'the-big-bluff') {
+        showBBReveal(s.reveal);
       } else if (s.reveal) {
         const mine = (s.reveal.results || []).find(r => r.playerId === playerId);
         const res = document.getElementById('p-result');

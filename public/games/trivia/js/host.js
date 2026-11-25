@@ -176,8 +176,27 @@ function renderOptions(container, options, opts = {}) {
 socket.on('question', (d) => {
   if (d.mode === 'same-letter') showSLQuestion(d);
   else if (d.mode === 'closest-wins') showCWQuestion(d);
+  else if (d.mode === 'the-big-bluff') showBBQuestion(d);
   else showFFQuestion(d);
 });
+function showBBQuestion(d) {
+  Sounds.wordReveal();
+  if (d.stage === 'vote') {
+    document.getElementById('q-vote-num').textContent = `Question ${d.qNumber} of ${d.qCount}`;
+    document.getElementById('q-vote-prompt').textContent = d.prompt;
+    const box = document.getElementById('q-vote-options'); box.innerHTML = '';
+    (d.options || []).forEach(o => { const el = document.createElement('div'); el.className = 'bb-option'; el.textContent = o.text; box.appendChild(el); });
+    const t = document.getElementById('q-vote-timer'); t.textContent = d.seconds; t.classList.remove('low');
+    document.getElementById('q-vote-progress').textContent = 'Players are voting…';
+    showScreen('screen-question-vote');
+  } else {
+    document.getElementById('q-bb-num').textContent = `Question ${d.qNumber} of ${d.qCount}`;
+    document.getElementById('q-bb-prompt').textContent = d.prompt;
+    const t = document.getElementById('q-bb-timer'); t.textContent = d.seconds; t.classList.remove('low');
+    document.getElementById('q-bb-progress').textContent = 'Players are writing their bluffs…';
+    showScreen('screen-question-bluff');
+  }
+}
 function showCWQuestion(d) {
   Sounds.wordReveal();
   document.getElementById('q-cw-num').textContent = `Question ${d.qNumber} of ${d.qCount}`;
@@ -205,24 +224,45 @@ function showSLQuestion(d) {
   showScreen('screen-question-sl');
 }
 socket.on('timer', ({ secondsLeft }) => {
-  ['q-timer', 'q-sl-timer', 'q-cw-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
+  ['q-timer', 'q-sl-timer', 'q-cw-timer', 'q-bb-timer', 'q-vote-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
   if (secondsLeft <= 5 && secondsLeft > 0) Sounds.tick();
 });
 socket.on('answer-progress', ({ answered, total }) => {
   const ff = document.getElementById('q-progress'); if (ff) ff.textContent = `${answered} / ${total} answered`;
   const sl = document.getElementById('q-sl-progress'); if (sl) sl.textContent = `${answered} of ${total} players answering…`;
   const cw = document.getElementById('q-cw-progress'); if (cw) cw.textContent = `${answered} of ${total} players guessing…`;
+  const bb = document.getElementById('q-bb-progress'); if (bb) bb.textContent = `${answered} of ${total} wrote a bluff`;
+  const vote = document.getElementById('q-vote-progress'); if (vote) vote.textContent = `${answered} of ${total} voted`;
 });
 document.getElementById('btn-reveal').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-reveal-sl').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-reveal-cw').addEventListener('click', () => socket.emit('advance'));
+document.getElementById('btn-bb-to-vote').addEventListener('click', () => socket.emit('advance'));
+document.getElementById('btn-vote-reveal').addEventListener('click', () => socket.emit('advance'));
 
 // ── Reveal ──
 socket.on('question-reveal', (d) => {
   if (d.mode === 'same-letter') showSLReveal(d);
   else if (d.mode === 'closest-wins') showCWReveal(d);
+  else if (d.mode === 'the-big-bluff') showBBReveal(d);
   else showFFReveal(d);
 });
+function showBBReveal(d) {
+  Sounds.pointAwarded();
+  const box = document.getElementById('reveal-bb-options'); box.innerHTML = '';
+  (d.options || []).forEach(o => {
+    const el = document.createElement('div');
+    el.className = 'bb-option' + (o.isTruth ? ' truth' : '');
+    const meta = o.isTruth
+      ? (o.votes.length ? `✅ THE TRUTH — found by ${o.votes.join(', ')}` : '✅ THE TRUTH — nobody found it!')
+      : `🎭 ${o.authors.join(', ') || '?'}${o.votes.length ? ` — fooled ${o.votes.join(', ')}` : ' — fooled nobody'}`;
+    el.innerHTML = `<div>${escapeHtml(o.text)}</div><div class="bb-meta">${escapeHtml(meta)}</div>`;
+    box.appendChild(el);
+  });
+  currentScores = d.scores;
+  renderScoreCards('reveal-bb-scores', d.scores);
+  showScreen('screen-reveal-bluff');
+}
 function showFFReveal(d) {
   Sounds.pointAwarded();
   const top = (d.results || []).find(r => r.correct);
@@ -267,6 +307,7 @@ function showCWReveal(d) {
 document.getElementById('btn-next').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-next-sl').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-next-cw').addEventListener('click', () => socket.emit('advance'));
+document.getElementById('btn-next-bb').addEventListener('click', () => socket.emit('advance'));
 
 // ── Round over ──
 socket.on('round-over', (d) => {

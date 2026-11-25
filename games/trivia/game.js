@@ -12,6 +12,7 @@ const MODES = {
   'fastest-finger': require('./modes/fastest-finger'),
   'same-letter': require('./modes/same-letter'),
   'closest-wins': require('./modes/closest-wins'),
+  'the-big-bluff': require('./modes/the-big-bluff'),
 };
 
 const rooms = new Map();
@@ -112,6 +113,21 @@ module.exports = function registerTrivia(namespace, localIP, port) {
     emitPlayers(room);
   }
 
+  // server-authoritative countdown for the current stage, mirrored for reconnects
+  function startStageTimer(room) {
+    clearRoomTimer(room);
+    room.questionTimer = setInterval(() => {
+      room.secondsLeft--;
+      if (room.secondsLeft > 0) { namespace.to(room.roomCode).emit('timer', { secondsLeft: room.secondsLeft }); }
+      else { namespace.to(room.roomCode).emit('timer', { secondsLeft: 0 }); resolveStage(room); }
+    }, 1000);
+  }
+
+  function broadcastStage(room) {
+    const round = currentRound(room);
+    namespace.to(room.roomCode).emit('question', { ...room.currentPublic, roundIndex: room.roundIndex, qNumber: room.qIndexInRound + 1, qCount: round.count, seconds: room.secondsLeft });
+  }
+
   function beginQuestion(room) {
     const round = currentRound(room);
     const mode = MODES[round.mode];
@@ -119,22 +135,27 @@ module.exports = function registerTrivia(namespace, localIP, port) {
     room.phase = 'question';
     room.currentPublic = mode.publicQuestion(room);
     room.currentReveal = null;
-    room.secondsLeft = round.seconds;
-    const payload = { ...room.currentPublic, roundIndex: room.roundIndex, qNumber: room.qIndexInRound + 1, qCount: round.count, seconds: round.seconds };
-    namespace.to(room.roomCode).emit('question', payload);
-    // server-authoritative countdown, mirrored for reconnects
-    clearRoomTimer(room);
-    room.questionTimer = setInterval(() => {
-      room.secondsLeft--;
-      if (room.secondsLeft > 0) { namespace.to(room.roomCode).emit('timer', { secondsLeft: room.secondsLeft }); }
-      else { namespace.to(room.roomCode).emit('timer', { secondsLeft: 0 }); resolveQuestion(room); }
-    }, 1000);
+    room.secondsLeft = room.currentPublic.seconds || round.seconds;
+    broadcastStage(room);
+    startStageTimer(room);
   }
 
-  function resolveQuestion(room) {
+  // A stage ended (timer ran out, or the host advanced, or everyone's in).
+  // Multi-stage modes (e.g. The Big Bluff) return the next stage here; otherwise
+  // we score and reveal.
+  function resolveStage(room) {
     clearRoomTimer(room);
     if (room.phase !== 'question') return;
-    const reveal = modeOf(room).score(room);
+    const mode = modeOf(room);
+    const next = mode.nextStage ? mode.nextStage(room) : null;
+    if (next) {
+      room.currentPublic = next;
+      room.secondsLeft = next.seconds || currentRound(room).seconds;
+      broadcastStage(room);
+      startStageTimer(room);
+      return;
+    }
+    const reveal = mode.score(room);
     reveal.scores = getScores(room);
     reveal.roundIndex = room.roundIndex;
     reveal.qNumber = room.qIndexInRound + 1;
@@ -176,7 +197,7 @@ module.exports = function registerTrivia(namespace, localIP, port) {
       room.qIndexInRound = 0;
       beginQuestion(room);
     } else if (room.phase === 'question') {
-      resolveQuestion(room);                 // host chose to cut the timer short
+      resolveStage(room);                    // host chose to cut the stage short
     } else if (room.phase === 'question-reveal') {
       const round = currentRound(room);
       if (room.qIndexInRound + 1 < round.count) { room.qIndexInRound++; beginQuestion(room); }
@@ -313,13 +334,14 @@ module.exports = function registerTrivia(namespace, localIP, port) {
       if (!room || room.phase !== 'question') return;
       const player = room.players.find(p => p.socketId === socket.id);
       if (!player) return;
-      const res = modeOf(room).submit(room, player, payload || {});
+      const mode = modeOf(room);
+      const res = mode.submit(room, player, payload || {});
       if (res && res.ok) {
         socket.emit('you-submitted', res.ack || { choice: res.choice });
-        const answered = room.modeState && room.modeState.answers ? room.modeState.answers.size : 0;
+        const answered = mode.progressCount ? mode.progressCount(room) : (room.modeState && room.modeState.answers ? room.modeState.answers.size : 0);
         const total = room.players.filter(p => p.connected).length;
         if (room.hostSocketId) namespace.to(room.hostSocketId).emit('answer-progress', { answered, total });
-        if (res.allAnswered) resolveQuestion(room);
+        if (res.allAnswered) resolveStage(room);
       }
     });
 

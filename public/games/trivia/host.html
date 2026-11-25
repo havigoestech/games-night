@@ -78,6 +78,13 @@
     .cw-guess-name { flex:1; font-weight:700; text-align:left; }
     .cw-guess-val { font-family:'Fredoka',sans-serif; font-weight:700; }
     .cw-guess-pts { font-family:'Fredoka',sans-serif; font-weight:700; color:#FFD60A; min-width:56px; text-align:right; }
+
+    /* The Big Bluff */
+    .bb-prompt { font-family:'Fredoka',sans-serif; font-size:clamp(1.3rem,3.5vw,1.9rem); font-weight:700; text-align:center; line-height:1.35; }
+    .bb-options { display:flex; flex-direction:column; gap:10px; width:100%; max-width:560px; max-height:360px; overflow-y:auto; }
+    .bb-option { padding:14px 18px; border-radius:14px; background:rgba(255,255,255,0.05); border:2px solid rgba(255,255,255,0.1); font-weight:700; font-size:1.05rem; text-align:center; }
+    .bb-option.truth { background:rgba(52,199,89,0.2); border-color:#34C759; }
+    .bb-option .bb-meta { font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-top:5px; }
   </style>
 </head>
 <body>
@@ -210,6 +217,39 @@
       <div class="cw-guesses" id="reveal-cw-guesses"></div>
       <div style="width:100%"><div class="section-label mb-8" style="text-align:left">Scores</div><div class="score-grid" id="reveal-cw-scores"></div></div>
       <button class="btn btn-reveal mt-8" id="btn-next-cw" style="max-width:320px">Next →</button>
+    </div>
+  </div>
+
+  <!-- QUESTION (Big Bluff — write a fake) -->
+  <div id="screen-question-bluff" class="screen col center gap-0">
+    <div class="trv-game-inner">
+      <div class="trv-qmeta"><span id="q-bb-num"></span> · 🎭 Make up a convincing lie!</div>
+      <div class="trv-timer" id="q-bb-timer">45</div>
+      <div class="bb-prompt" id="q-bb-prompt"></div>
+      <div class="trv-progress" id="q-bb-progress">Players are writing their bluffs…</div>
+      <button class="btn btn-ghost" id="btn-bb-to-vote" style="max-width:320px">To the vote →</button>
+    </div>
+  </div>
+
+  <!-- QUESTION (Big Bluff — vote) -->
+  <div id="screen-question-vote" class="screen col center gap-0">
+    <div class="trv-game-inner">
+      <div class="trv-qmeta"><span id="q-vote-num"></span> · 🤔 Which one is the TRUTH?</div>
+      <div class="trv-timer" id="q-vote-timer">30</div>
+      <div class="bb-prompt" id="q-vote-prompt"></div>
+      <div class="bb-options" id="q-vote-options"></div>
+      <div class="trv-progress" id="q-vote-progress">Players are voting…</div>
+      <button class="btn btn-ghost" id="btn-vote-reveal" style="max-width:320px">Reveal the truth →</button>
+    </div>
+  </div>
+
+  <!-- REVEAL (Big Bluff) -->
+  <div id="screen-reveal-bluff" class="screen col center gap-0">
+    <div class="trv-game-inner">
+      <div class="trv-reveal-sub">🎭 The truth was…</div>
+      <div class="bb-options" id="reveal-bb-options"></div>
+      <div style="width:100%"><div class="section-label mb-8" style="text-align:left">Scores</div><div class="score-grid" id="reveal-bb-scores"></div></div>
+      <button class="btn btn-reveal mt-8" id="btn-next-bb" style="max-width:320px">Next →</button>
     </div>
   </div>
 

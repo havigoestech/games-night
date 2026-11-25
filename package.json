@@ -12,6 +12,7 @@
     "test:trivia-data": "node test/trivia-data.test.js",
     "test:trivia-sl": "node test/trivia-same-letter.test.js",
     "test:trivia-cw": "node test/trivia-closest-wins.test.js",
+    "test:trivia-bb": "node test/trivia-the-big-bluff.test.js",
     "test:tt": "node test/text-twist.test.js",
     "test:ki": "node test/kill-and-injury.test.js",
     "test:tourney": "node test/tournament.test.js",
