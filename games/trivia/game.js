@@ -4,6 +4,7 @@
 // modules in ./modes; this engine owns the common lifecycle, timer, scoring
 // accumulation and reconnect snapshots.
 const QRCode = require('qrcode');
+const orchestrator = require('../tournament/orchestrator');
 
 const TEAM_COLORS = ['#FF2D55', '#5856D6', '#FF9500', '#34C759', '#00C7BE', '#FF375F', '#BF5AF2', '#FFD60A'];
 const ROOM_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -185,10 +186,16 @@ module.exports = function registerTrivia(namespace, localIP, port) {
   }
 
   function endGame(room) {
+    if (room.concluded) return;
+    room.concluded = true;
     clearRoomTimer(room);
     room.phase = 'game-over';
     const scores = getScores(room).sort((a, b) => b.score - a.score);
     namespace.to(room.roomCode).emit('game-over', { scores });
+    // Tournament hand-back: report final standings to the orchestrator.
+    if (room.tournament && typeof room.onComplete === 'function') {
+      try { room.onComplete(scores); } catch (e) { console.error('[trivia] onComplete error:', e.message); }
+    }
   }
 
   // Move the state machine forward from wherever it is (the host's "Next" button).
@@ -322,10 +329,40 @@ module.exports = function registerTrivia(namespace, localIP, port) {
       advance(room);
     });
 
+    // Host adjusts a live reveal (e.g. Same Letter strike) — delegated to the mode.
+    socket.on('host-action', (payload) => {
+      const room = rooms.get(socket.roomCode);
+      if (!room || !socket.isHost || room.phase !== 'question-reveal') return;
+      const mode = modeOf(room);
+      if (mode && mode.hostAction && mode.hostAction(room, payload || {})) {
+        const reveal = room.currentReveal;
+        reveal.scores = getScores(room);
+        namespace.to(room.roomCode).emit('question-reveal', reveal);
+      }
+    });
+
     socket.on('end-game', () => {
       const room = rooms.get(socket.roomCode);
       if (!room || !socket.isHost) return;
       endGame(room);
+    });
+
+    // Tournament: the host page adopts a pre-created room instead of creating one.
+    socket.on('claim-host', ({ roomCode }) => {
+      const code = (roomCode || '').toUpperCase().trim();
+      const room = rooms.get(code);
+      if (!room || !room.tournament) return;
+      room.hostSocketId = socket.id;
+      socket.join(code);
+      socket.roomCode = code;
+      socket.isHost = true;
+      socket.emit('host-attached', {
+        roomCode: code,
+        teamMode: room.teamMode,
+        teams: getScores(room),
+        ...snapshot(room, null)
+      });
+      emitPlayers(room);
     });
 
     // ── Player answer ──
@@ -359,5 +396,39 @@ module.exports = function registerTrivia(namespace, localIP, port) {
         if (player) { player.connected = false; emitPlayers(room); }
       }
     });
+  });
+
+  // ── Tournament integration (gated by room.tournament) ───────
+  // Trivia runs in a tournament as a single Fastest Finger round; the tournament's
+  // "length" is the number of questions. The host adopts the room via claim-host,
+  // plays the round, and endGame() hands final standings back to the orchestrator.
+  orchestrator.register('trivia', ({ roster, teams, mode, config, length, onComplete }) => {
+    const roomCode = generateRoomCode();
+    const gameMode = mode === 'individual' ? 'individual' : 'teams';
+    const builtTeams = (teams || []).map((t, i) => ({
+      name: t.name, color: t.color || TEAM_COLORS[i % TEAM_COLORS.length], score: 0
+    }));
+    const count = Math.min(Math.max(parseInt(length) || 8, 1), 20);
+    const room = {
+      roomCode,
+      hostSocketId: null,
+      teams: builtTeams,
+      players: (roster || []).map(r => ({ socketId: null, playerId: r.playerId, name: r.name, teamIndex: r.teamIndex, connected: false })),
+      teamMode: gameMode,
+      familyFriendly: true,
+      playlist: sanitizePlaylist([{ mode: 'fastest-finger', category: 'any', difficulty: 'any', count, seconds: 20 }]),
+      phase: 'lobby',
+      roundIndex: -1, qIndexInRound: -1,
+      currentQuestion: null, modeState: null, currentPublic: null, currentReveal: null,
+      usedQuestions: new Set(),
+      secondsLeft: null, questionTimer: null,
+      roundScoreBase: null, lastRoundScores: null,
+      tournament: true,
+      onComplete,
+      concluded: false
+    };
+    rooms.set(roomCode, room);
+    console.log('[trivia] tournament room', roomCode, '| mode:', gameMode, '| questions:', count, '| players:', room.players.length);
+    return { roomCode };
   });
 };

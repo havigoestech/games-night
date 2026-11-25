@@ -1,5 +1,13 @@
 const socket = io('/trivia');
 
+// Launched as part of a tournament? Adopt the pre-created room and return when done.
+const TOURNEY = (() => {
+  const p = new URLSearchParams(location.search);
+  const room = p.get('room'), t = p.get('t');
+  return (room && t) ? { room: room.toUpperCase(), t: t.toUpperCase() } : null;
+})();
+if (TOURNEY) socket.on('connect', () => socket.emit('claim-host', { roomCode: TOURNEY.room }));
+
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 let teamMode = 'teams';
 let categories = [];
@@ -145,6 +153,7 @@ function renderPlayerGroups() {
   });
 }
 document.getElementById('btn-start-game').addEventListener('click', () => socket.emit('start-game'));
+document.getElementById('btn-end-game-lobby').addEventListener('click', () => socket.emit('end-game'));
 
 // ── Round intro ──
 socket.on('round-intro', (d) => {
@@ -259,6 +268,7 @@ function showBBReveal(d) {
     el.innerHTML = `<div>${escapeHtml(o.text)}</div><div class="bb-meta">${escapeHtml(meta)}</div>`;
     box.appendChild(el);
   });
+  renderScorers('reveal-bb-scorers', d.results, r => { const b = []; if (r.foundTruth) b.push('found truth'); if (r.fooled) b.push(`fooled ${r.fooled}`); return b.join(' · ') || 'bluffed out'; });
   currentScores = d.scores;
   renderScoreCards('reveal-bb-scores', d.scores);
   showScreen('screen-reveal-bluff');
@@ -269,21 +279,25 @@ function showFFReveal(d) {
   document.getElementById('reveal-sub').innerHTML = top ? `✅ <strong>${escapeHtml(d.correct)}</strong> — fastest: ${escapeHtml(top.name)}` : `✅ <strong>${escapeHtml(d.correct)}</strong>`;
   document.getElementById('reveal-question').textContent = d.question;
   renderOptions(document.getElementById('reveal-options'), d.options, { correctIndex: d.correctIndex, distribution: d.distribution });
+  renderScorers('reveal-ff-scorers', d.results, r => r.correct ? 'got it' : 'missed');
   currentScores = d.scores;
   renderScoreCards('reveal-scores', d.scores);
   showScreen('screen-reveal');
 }
 function showSLReveal(d) {
   Sounds.pointAwarded();
-  document.getElementById('reveal-sl-sub').innerHTML = `🔤 ${escapeHtml(d.category)} · starting with <span class="sl-letter">${escapeHtml(d.letter)}</span>`;
+  document.getElementById('reveal-sl-sub').innerHTML = `🔤 ${escapeHtml(d.category)} · starting with <span class="sl-letter">${escapeHtml(d.letter)}</span> &nbsp;·&nbsp; <span style="font-size:0.72rem;color:var(--text-muted);font-weight:600">tap an answer to disqualify it</span>`;
   const box = document.getElementById('reveal-sl-groups'); box.innerHTML = '';
   (d.groups || []).forEach(g => {
     const chip = document.createElement('div');
-    chip.className = 'sl-chip ' + (g.scored ? 'scored' : 'cancelled');
-    chip.innerHTML = `<span class="txt">${escapeHtml(g.text)}</span>${g.count > 1 ? `<span class="who">×${g.count}</span>` : ''}`;
+    chip.className = 'sl-chip ' + (g.struck ? 'struck' : (g.scored ? 'scored' : 'cancelled')) + (g.flagged ? ' flagged' : '');
+    chip.style.cursor = 'pointer';
+    chip.innerHTML = `<span class="txt">${escapeHtml(g.text)}</span>${g.flagged ? '<span class="who" title="not a dictionary word">⚠️</span>' : ''}${g.count > 1 ? `<span class="who">×${g.count}</span>` : ''}`;
+    chip.addEventListener('click', () => socket.emit('host-action', { type: 'strike', text: g.text }));
     box.appendChild(chip);
   });
   if (!(d.groups || []).length) box.innerHTML = '<div style="color:var(--text-muted)">No answers this round!</div>';
+  renderScorers('reveal-sl-scorers', d.results, r => `${r.unique} unique of ${r.total}`);
   currentScores = d.scores;
   renderScoreCards('reveal-sl-scores', d.scores);
   showScreen('screen-reveal-sl');
@@ -322,7 +336,27 @@ socket.on('round-over', (d) => {
 document.getElementById('btn-next-round').addEventListener('click', () => socket.emit('advance'));
 
 // ── Game over ──
-socket.on('game-over', ({ scores }) => { Sounds.gameOver(); renderLeaderboard('final-leaderboard', scores); showScreen('screen-game-over'); });
+socket.on('game-over', ({ scores }) => {
+  Sounds.gameOver();
+  renderLeaderboard('final-leaderboard', scores);
+  showScreen('screen-game-over');
+  if (TOURNEY) setTimeout(() => { location.href = `/games/tournament/host.html?room=${TOURNEY.t}`; }, 3500);
+});
+
+// Tournament: adopt the pre-created room — hide the join code/QR, just start.
+socket.on('host-attached', (data) => {
+  teamMode = data.teamMode || 'teams';
+  currentScores = (data.teams || []).map((t, i) => ({ index: i, name: t.name, color: t.color, score: t.score || 0 }));
+  allPlayers = [];
+  const codeSec = document.querySelector('#screen-lobby .lobby-code-section');
+  if (codeSec) codeSec.style.display = 'none';
+  // An escape hatch: a host who'd rather skip this game ends it (concludes a tie)
+  // and the tournament moves on to the next game.
+  const endBtn = document.getElementById('btn-end-game-lobby');
+  if (endBtn) endBtn.style.display = 'inline-flex';
+  renderPlayerGroups();
+  showScreen('screen-lobby');
+});
 
 // ── Shared renderers (copied convention) ──
 function renderScoreCards(id, scores) {
@@ -332,4 +366,15 @@ function renderScoreCards(id, scores) {
 function renderLeaderboard(id, scores) {
   const c = document.getElementById(id); if (!c || !scores) return; c.innerHTML = '';
   [...scores].sort((a, b) => b.score - a.score).forEach((s, i) => { const w = i === 0; const row = document.createElement('div'); row.className = `lb-row${w ? ' winner' : ''}`; if (w) row.style.cssText = `background:${s.color}22;border-color:${s.color}`; row.innerHTML = `<div class="lb-rank">${w ? '👑' : i + 1}</div><div class="lb-name" style="color:${s.color}">${escapeHtml(s.name)}</div><div class="lb-score">${s.score}</div>`; c.appendChild(row); });
+}
+// Per-player points for a single question/round, so the maths is visible.
+function renderScorers(id, results, detailFn) {
+  const c = document.getElementById(id); if (!c) return; c.innerHTML = '';
+  if (!results || !results.length) { c.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem">No points this round</div>'; return; }
+  results.forEach(r => {
+    const row = document.createElement('div'); row.className = 'trv-scorer';
+    const detail = detailFn ? detailFn(r) : '';
+    row.innerHTML = `<span class="trv-scorer-name">${escapeHtml(r.name)}</span>${detail ? `<span class="trv-scorer-detail">${escapeHtml(detail)}</span>` : ''}<span class="trv-scorer-pts${r.points > 0 ? '' : ' zero'}">+${r.points}</span>`;
+    c.appendChild(row);
+  });
 }

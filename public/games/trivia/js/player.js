@@ -11,6 +11,13 @@ const playerId = (() => {
   } catch (e) { return 'p-' + Math.random().toString(36).slice(2) + Date.now().toString(36); }
 })();
 
+// Launched as part of a tournament? Rejoin the pre-created room and return when done.
+const TOURNEY = (() => {
+  const p = new URLSearchParams(location.search);
+  const room = p.get('room'), t = p.get('t');
+  return (room && t) ? { room: room.toUpperCase(), t: t.toUpperCase() } : null;
+})();
+
 let myTeamIndex = -1, myTeamColor = '#5856D6', teamNames = [], teamColors = [];
 let joinedRoomCode = null, pendingName = '', pendingRoom = '';
 let answered = false, myChoice = null, currentOptions = [];
@@ -23,7 +30,7 @@ function saveSession(rc) { try { sessionStorage.setItem('trivia-session', JSON.s
 function clearSession() { joinedRoomCode = null; try { sessionStorage.removeItem('trivia-session'); } catch (e) {} }
 
 // ── Reconnect ──
-socket.on('connect', () => { const sess = savedSession(); const rc = joinedRoomCode || (sess && sess.roomCode); if (rc) socket.emit('rejoin-room', { roomCode: rc, playerId }); });
+socket.on('connect', () => { const sess = savedSession(); const rc = (TOURNEY && TOURNEY.room) || joinedRoomCode || (sess && sess.roomCode); if (rc) socket.emit('rejoin-room', { roomCode: rc, playerId }); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && joinedRoomCode && socket.connected) socket.emit('request-sync'); });
 socket.on('rejoin-failed', ({ message }) => { clearSession(); document.getElementById('join-error').textContent = message || 'Please join again.'; showScreen('screen-join'); });
 
@@ -274,7 +281,7 @@ function showSLReveal(d, myAnswers) {
 }
 
 socket.on('round-over', (d) => { Sounds.go(); renderLeaderboard('p-ro-leaderboard', d.scores); showScreen('screen-round-over'); });
-socket.on('game-over', ({ scores }) => { Sounds.gameOver(); clearSession(); renderLeaderboard('p-final-leaderboard', scores); showScreen('screen-game-over'); });
+socket.on('game-over', ({ scores }) => { Sounds.gameOver(); clearSession(); renderLeaderboard('p-final-leaderboard', scores); showScreen('screen-game-over'); if (TOURNEY) setTimeout(() => { location.href = `/games/tournament/player.html?room=${TOURNEY.t}`; }, 3500); });
 socket.on('host-disconnected', () => { clearSession(); showScreen('screen-host-gone'); });
 
 // ── Snapshot router (reconnect) ──

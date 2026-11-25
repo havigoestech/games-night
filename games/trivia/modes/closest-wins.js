@@ -28,6 +28,12 @@ module.exports = {
     return { mode: 'closest-wins', question: q.q, unit: q.unit || '' };
   },
 
+  // The engine reads this for the host's "N of M guessing" counter (our state
+  // is keyed under `guesses`, not the default `answers`).
+  progressCount(room) {
+    return room.modeState ? room.modeState.guesses.size : 0;
+  },
+
   submit(room, player, payload) {
     const m = room.modeState;
     if (!m) return { ok: false };

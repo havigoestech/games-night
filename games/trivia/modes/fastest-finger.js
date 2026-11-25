@@ -22,12 +22,18 @@ function shuffle(arr) {
 }
 const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
+// Fandom-heavy categories that make "Any" feel too niche — excluded from the
+// default pool (still pickable on purpose by selecting the category).
+const NICHE = new Set(['Japanese Anime & Manga', 'Cartoon & Animations', 'Video Games', 'Board Games', 'Comics']);
+
 function pickQuestion(room, cfg) {
   const wantCat = cfg.category && cfg.category !== 'any' ? cfg.category : null;
   const wantDiff = cfg.difficulty && cfg.difficulty !== 'any' ? cfg.difficulty : null;
   const match = q =>
-    (!wantCat || q.cat === wantCat) &&
-    (!wantDiff || q.diff === wantDiff) &&
+    // "Any category" skips the nerdy fandom categories; a chosen category is honoured as-is.
+    (wantCat ? q.cat === wantCat : !NICHE.has(q.cat)) &&
+    // "Any difficulty" leans easier (drops hard) for a friendlier default; a chosen difficulty is honoured.
+    (wantDiff ? q.diff === wantDiff : q.diff !== 'hard') &&
     (!room.familyFriendly || q.clean !== false);
   let pool = BANK.filter(q => match(q) && !room.usedQuestions.has(norm(q.q)));
   if (!pool.length) pool = BANK.filter(match);                 // ran out — allow repeats

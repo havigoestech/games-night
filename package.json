@@ -18,6 +18,7 @@
     "test:tourney": "node test/tournament.test.js",
     "test:tourney-loop": "node test/tournament-loop.test.js",
     "test:tourney-gtm": "node test/tournament-gtm.test.js",
+    "test:tourney-trivia": "node test/tournament-trivia.test.js",
     "test:tourney-squad": "node test/tournament-squad.test.js"
   },
   "dependencies": {

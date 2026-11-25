@@ -9,6 +9,17 @@ const MAX_LEN = 40;
 
 const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
+// Reuse Text Twist's English dictionary to FLAG likely-gibberish answers for the
+// host (we flag, not reject — tons of valid answers are names/brands/places that
+// aren't in a dictionary). The host's tap-to-strike is the real gate.
+let DICT = null;
+try { DICT = require('../text-twist/puzzles').dictionary; } catch (e) { DICT = null; }
+function isFlagged(text) {
+  if (!DICT) return false;
+  const words = norm(text).split(' ').filter(Boolean);
+  return words.length > 0 && !words.some(w => DICT.has(w));   // flagged only if NO word is a real word
+}
+
 module.exports = {
   meta: { key: 'same-letter', name: 'Same Letter', icon: '🔤', defaultSeconds: 60 },
 
@@ -60,7 +71,9 @@ module.exports = {
     const groups = [];
     for (const [, subs] of tally) {
       const scored = subs.length === 1;              // unique → scores; shared → cancelled
-      groups.push({ text: subs[0].text, count: subs.length, names: subs.map(s => s.name), scored });
+      const g = { text: subs[0].text, count: subs.length, names: subs.map(s => s.name), scored, struck: false, flagged: isFlagged(subs[0].text) };
+      if (scored) { g.scoredTeam = subs[0].teamIndex; g.scoredPlayerId = subs[0].playerId; }
+      groups.push(g);
       if (scored) {
         const s = subs[0];
         if (room.teams[s.teamIndex]) room.teams[s.teamIndex].score += POINTS_PER;
@@ -76,6 +89,23 @@ module.exports = {
     results.sort((a, b) => b.points - a.points);
     groups.sort((a, b) => (b.scored - a.scored) || (a.count - b.count) || a.text.localeCompare(b.text));
     return { mode: 'same-letter', category: m.category, letter: m.letter, groups, results, roundPoints: perTeam };
+  },
+
+  // Host tap-to-strike at the reveal: toggles an answer in/out and adjusts the
+  // scoring player's team score + per-player points. Operates on the live reveal.
+  hostAction(room, payload) {
+    if (!payload || payload.type !== 'strike' || !room.currentReveal) return false;
+    const rev = room.currentReveal;
+    const g = rev.groups.find(x => x.text === payload.text);
+    if (!g) return false;
+    g.struck = !g.struck;
+    if (g.scoredTeam != null && room.teams[g.scoredTeam]) {
+      const delta = g.struck ? -POINTS_PER : POINTS_PER;
+      room.teams[g.scoredTeam].score += delta;
+      const pr = (rev.results || []).find(r => r.playerId === g.scoredPlayerId);
+      if (pr) { pr.points += delta; pr.unique += g.struck ? -1 : 1; }
+    }
+    return true;
   },
 
   youState(room, playerId) {
