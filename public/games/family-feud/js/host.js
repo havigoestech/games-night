@@ -63,7 +63,8 @@ document.getElementById('btn-create').addEventListener('click', () => {
     const el = document.getElementById(`team-name-${i}`);
     return el ? el.value.trim() : '';
   });
-  socket.emit('create-room', { teamNames, baseUrl: `${location.protocol}//${location.host}` });
+  const familyFriendly = document.getElementById('ff-clean-toggle').checked;
+  socket.emit('create-room', { teamNames, familyFriendly, baseUrl: `${location.protocol}//${location.host}` });
 
   setTimeout(() => { btn.textContent = 'Create Room'; btn.disabled = false; dbg(''); }, 8000);
 });

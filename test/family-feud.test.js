@@ -95,10 +95,11 @@ async function main() {
     let foOpen = once(players.B2, 'faceoff-open');
     host.emit('start-question');
     const [hq, pq, fo] = await Promise.all([hostQS, playerQS, foOpen]);
-    ok(Array.isArray(hq.answers) && hq.answers.length === 6 &&
+    const nAns = hq.answers.length;
+    ok(Array.isArray(hq.answers) && nAns >= 3 && nAns <= 8 &&
        typeof hq.answers[0].t === 'string' && typeof hq.answers[0].p === 'number',
-       'host copy has the full answer key (6 answers, text + points)');
-    ok(pq.answers === undefined && pq.answerCount === 6, 'player copy has NO answers, only the count');
+       `host copy has the full answer key (${nAns} answers, text + points)`);
+    ok(pq.answers === undefined && pq.answerCount === nAns, 'player copy has NO answers, only the count (matches host)');
     ok(fo.rebuzz === false, 'faceoff-open reaches players');
     const q1 = hq.answers;
 
@@ -130,7 +131,7 @@ async function main() {
     ok(tp1.controllingTeamIndex === 0 && tp1.choice === 'play', 'team 0 chose to play');
 
     let rc = once(host, 'round-complete');
-    for (let i = 1; i < 6; i++) host.emit('reveal-answer', { answerIndex: i });
+    for (let i = 1; i < q1.length; i++) host.emit('reveal-answer', { answerIndex: i });
     const rc1 = await rc;
     const q1Total = q1.reduce((s, a) => s + a.p, 0);
     t0Score += q1Total;
@@ -185,6 +186,7 @@ async function main() {
     hostQS = once(host, 'question-start');
     host.emit('start-question');
     const q3 = (await hostQS).answers;
+    const lastIdx3 = q3.length - 1; // a valid non-top answer (answer counts vary)
 
     fb = once(host, 'faceoff-buzz');
     players.A2.emit('buzz');
@@ -199,7 +201,7 @@ async function main() {
     ok(strikeEvents.length === 0, 'no wrong-answer strike event during face-off');
 
     won = once(host, 'faceoff-won');
-    host.emit('reveal-answer', { answerIndex: 4 });
+    host.emit('reveal-answer', { answerIndex: lastIdx3 });
     const w3 = await won;
     ok(w3.winnerTeamIndex === 1, 'counter team wins with ANY answer after a first-buzz miss');
 
@@ -212,9 +214,9 @@ async function main() {
     rc = once(host, 'round-complete');
     host.emit('host-wrong'); // steal attempt missed
     const rc3 = await rc;
-    t1Score += q3[4].p;
-    ok(rc3.reason === 'steal-failed' && rc3.winnerTeamIndex === 1 && rc3.pot === q3[4].p,
-       `steal failed: team 1 keeps the pot (${q3[4].p})`);
+    t1Score += q3[lastIdx3].p;
+    ok(rc3.reason === 'steal-failed' && rc3.winnerTeamIndex === 1 && rc3.pot === q3[lastIdx3].p,
+       `steal failed: team 1 keeps the pot (${q3[lastIdx3].p})`);
 
     // ── 7: Pre-buzz reveal blocked + both-miss rebuzz ──
     console.log('\n── 7: Pre-buzz reveal blocked · both-miss rebuzz ──');
@@ -260,6 +262,7 @@ async function main() {
     hostQS = once(host, 'question-start');
     host.emit('start-question');
     const q5 = (await hostQS).answers;
+    const lastIdx5 = q5.length - 1; // an unrevealed, valid index for the cleanup reveal
     fb = once(host, 'faceoff-buzz');
     players.A1.emit('buzz');
     await fb;
@@ -293,7 +296,7 @@ async function main() {
     ok(rc5.winnerTeamIndex === 0 && rc5.pot === q5[0].p, 'end-round from play-or-pass banks pot to face-off winner');
 
     const cleanup = once(host, 'answer-revealed');
-    host.emit('reveal-answer', { answerIndex: 3 });
+    host.emit('reveal-answer', { answerIndex: lastIdx5 });
     const cl = await cleanup;
     ok(cl.context === 'cleanup' && cl.pot === q5[0].p, 'cleanup reveal flips tile without touching the pot');
     host.emit('request-sync');
