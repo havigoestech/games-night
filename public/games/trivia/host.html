@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trivia - Host</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/boot.js"></script>
+  <style>
+    .back-link { display:inline-flex; align-items:center; gap:6px; color:rgba(255,255,255,0.4); font-size:0.85rem; font-weight:700; text-decoration:none; margin-bottom:8px; }
+    .section-label { font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-muted); margin-bottom:10px; }
+
+    /* Segmented toggle (teams / solo) */
+    .seg { display:flex; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:12px; padding:4px; gap:4px; }
+    .seg button { flex:1; padding:10px; border:none; background:transparent; color:rgba(255,255,255,0.6); font-family:'Fredoka',sans-serif; font-weight:600; font-size:0.95rem; border-radius:9px; cursor:pointer; }
+    .seg button.active { background:linear-gradient(135deg,#00C7BE,#5856D6); color:#fff; }
+
+    /* Stepper */
+    .stepper { display:flex; align-items:center; gap:14px; justify-content:center; }
+    .stepper button { width:44px; height:44px; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff; font-size:1.4rem; font-family:'Fredoka',sans-serif; cursor:pointer; }
+    .stepper .val { font-family:'Fredoka',sans-serif; font-size:1.8rem; font-weight:700; min-width:40px; text-align:center; }
+
+    /* Playlist builder */
+    .trv-round-card { background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:14px; padding:12px 14px; display:flex; flex-direction:column; gap:10px; text-align:left; }
+    .trv-round-head { display:flex; align-items:center; justify-content:space-between; font-family:'Fredoka',sans-serif; font-weight:700; }
+    .trv-round-del { background:none; border:none; color:rgba(255,255,255,0.4); cursor:pointer; font-size:1.1rem; }
+    .trv-round-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .trv-round-grid label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); display:block; margin-bottom:3px; }
+    .trv-round-grid select, .trv-round-grid input { width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:9px; color:#fff; font-family:'Nunito',sans-serif; font-size:0.9rem; font-weight:600; padding:8px 10px; }
+    .btn-add-round { background:rgba(255,255,255,0.06); border:1px dashed rgba(255,255,255,0.25); color:rgba(255,255,255,0.8); border-radius:12px; padding:12px; font-family:'Fredoka',sans-serif; font-weight:600; cursor:pointer; }
+
+    /* Lobby */
+    .lobby-code-section { display:flex; align-items:center; gap:24px; flex-wrap:wrap; justify-content:center; margin-bottom:12px; }
+    .lobby-join-url { font-size:0.8rem; color:var(--text-muted); margin-top:6px; word-break:break-all; }
+    #screen-lobby { justify-content:flex-start; padding-top:32px; }
+
+    /* Round intro */
+    .trv-intro-badge { font-family:'Fredoka',sans-serif; font-size:3rem; font-weight:700; }
+    .trv-intro-round { font-size:0.85rem; font-weight:800; text-transform:uppercase; letter-spacing:0.12em; color:var(--text-muted); }
+
+    /* Question screen */
+    #screen-question, #screen-reveal { justify-content:flex-start; padding-top:16px; }
+    .trv-game-inner { width:100%; max-width:820px; display:flex; flex-direction:column; gap:16px; align-items:center; }
+    .trv-qmeta { display:flex; gap:12px; align-items:center; justify-content:center; font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; }
+    .trv-qmeta .cat { color:#00C7BE; }
+    .trv-timer { font-family:'Fredoka',sans-serif; font-size:3rem; font-weight:700; line-height:1; color:#34C759; }
+    .trv-timer.low { color:#FF2D55; }
+    .trv-question { font-family:'Fredoka',sans-serif; font-size:clamp(1.3rem,3.5vw,2rem); font-weight:700; text-align:center; line-height:1.3; }
+    .trv-options { display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%; }
+    .trv-option { display:flex; align-items:center; gap:14px; background:rgba(255,255,255,0.05); border:2px solid rgba(255,255,255,0.1); border-radius:16px; padding:16px 18px; text-align:left; transition:all 0.25s; }
+    .trv-option-letter { width:40px; height:40px; flex-shrink:0; border-radius:10px; background:rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-family:'Fredoka',sans-serif; font-weight:700; font-size:1.2rem; }
+    .trv-option-text { font-size:1.05rem; font-weight:700; line-height:1.3; }
+    .trv-option.correct { background:rgba(52,199,89,0.2); border-color:#34C759; }
+    .trv-option.correct .trv-option-letter { background:#34C759; color:#fff; }
+    .trv-option.dim { opacity:0.4; }
+    .trv-option-count { margin-left:auto; font-family:'Fredoka',sans-serif; font-weight:700; color:var(--text-muted); flex-shrink:0; }
+    .trv-progress { font-size:0.95rem; font-weight:700; color:var(--text-muted); }
+    .trv-reveal-sub { font-family:'Fredoka',sans-serif; font-size:1.2rem; font-weight:700; }
+  </style>
+</head>
+<body>
+
+  <!-- SETUP -->
+  <div id="screen-setup" class="screen active col center gap-20">
+    <div class="col center gap-8">
+      <a href="/" class="back-link">← Games Night</a>
+      <span style="font-size:3rem">🧠</span>
+      <h1 class="heading" style="font-size:2.2rem">Trivia</h1>
+      <p style="color:var(--text-muted);font-size:0.95rem">Build your quiz night — pick rounds, then share the code.</p>
+    </div>
+    <div class="card col gap-16" style="max-width:520px">
+      <div>
+        <div class="section-label">Play as</div>
+        <div class="seg" id="seg-mode">
+          <button data-mode="teams" class="active">Teams</button>
+          <button data-mode="individual">Solo (free-for-all)</button>
+        </div>
+      </div>
+      <div id="teams-setup">
+        <div class="section-label">How many teams?</div>
+        <div class="stepper">
+          <button id="team-minus">−</button>
+          <div class="val" id="team-count">2</div>
+          <button id="team-plus">+</button>
+        </div>
+        <div id="team-name-inputs" class="col gap-8" style="margin-top:12px"></div>
+      </div>
+      <div>
+        <div class="section-label">Rounds</div>
+        <div id="playlist" class="col gap-10"></div>
+        <button class="btn-add-round w-full mt-8" id="btn-add-round">＋ Add round</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:12px 14px;text-align:left">
+        <input type="checkbox" id="clean-toggle" checked style="width:20px;height:20px;accent-color:#34C759;flex-shrink:0;cursor:pointer">
+        <span style="font-size:0.95rem;font-weight:600">👨‍👩‍👧 Family-friendly — hide rude questions</span>
+      </label>
+      <button class="btn btn-reveal mt-8" id="btn-create">Create Room</button>
+      <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
+    </div>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="screen-lobby" class="screen col center gap-16">
+    <div class="lobby-code-section">
+      <div style="text-align:center">
+        <div class="section-label">Room Code</div>
+        <div class="room-code" id="lobby-room-code">----</div>
+        <div class="lobby-join-url" id="lobby-join-url"></div>
+        <div id="lobby-player-address" style="font-size:0.85rem;color:#34C759;font-weight:700;margin-top:6px;background:rgba(52,199,89,0.12);border-radius:8px;padding:6px 12px"></div>
+      </div>
+      <div class="qr-wrap" id="lobby-qr" style="display:none"><img id="lobby-qr-img" width="160" height="160" alt="QR Code"></div>
+    </div>
+    <div style="width:100%;max-width:520px">
+      <div class="section-label mb-8">Players (<span id="player-count">0</span>)</div>
+      <div class="player-groups" id="player-groups"></div>
+    </div>
+    <button class="btn btn-reveal" id="btn-start-game" style="max-width:520px">Start Quiz</button>
+  </div>
+
+  <!-- ROUND INTRO -->
+  <div id="screen-round-intro" class="screen col center gap-16">
+    <div class="trv-intro-round" id="intro-round">Round 1 of 3</div>
+    <div class="trv-intro-badge" id="intro-badge">⚡ Fastest Finger</div>
+    <div id="intro-detail" style="color:var(--text-muted);font-size:1rem"></div>
+    <button class="btn btn-reveal mt-8" id="btn-start-round" style="max-width:420px">Start Round</button>
+  </div>
+
+  <!-- QUESTION -->
+  <div id="screen-question" class="screen col center gap-0">
+    <div class="trv-game-inner">
+      <div class="trv-qmeta"><span class="cat" id="q-cat"></span> · <span id="q-number"></span></div>
+      <div class="trv-timer" id="q-timer">20</div>
+      <div class="trv-question" id="q-question"></div>
+      <div class="trv-options" id="q-options"></div>
+      <div class="trv-progress" id="q-progress">0 / 0 answered</div>
+      <button class="btn btn-ghost" id="btn-reveal" style="max-width:320px">Reveal answer →</button>
+    </div>
+  </div>
+
+  <!-- REVEAL -->
+  <div id="screen-reveal" class="screen col center gap-0">
+    <div class="trv-game-inner">
+      <div class="trv-reveal-sub" id="reveal-sub"></div>
+      <div class="trv-question" id="reveal-question"></div>
+      <div class="trv-options" id="reveal-options"></div>
+      <div style="width:100%"><div class="section-label mb-8" style="text-align:left">Scores</div><div class="score-grid" id="reveal-scores"></div></div>
+      <button class="btn btn-reveal mt-8" id="btn-next" style="max-width:320px">Next →</button>
+    </div>
+  </div>
+
+  <!-- ROUND OVER -->
+  <div id="screen-round-over" class="screen col center gap-16">
+    <div style="font-size:2.4rem">🏁</div>
+    <h2 class="heading" id="ro-title" style="font-size:1.8rem">Round complete</h2>
+    <div class="leaderboard" id="ro-leaderboard" style="max-width:520px"></div>
+    <button class="btn btn-reveal mt-8" id="btn-next-round" style="max-width:420px">Next Round</button>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-20">
+    <div style="font-size:3rem">🏆</div>
+    <h2 class="heading" style="font-size:2rem">Final Scores</h2>
+    <div class="leaderboard" id="final-leaderboard" style="max-width:520px"></div>
+    <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/trivia/js/sounds.js"></script>
+  <script src="/games/trivia/js/host.js"></script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Trivia - Player</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/boot.js"></script>
+  <style>
+    .back-link { display:inline-flex; align-items:center; gap:6px; color:rgba(255,255,255,0.4); font-size:0.85rem; font-weight:700; text-decoration:none; margin-bottom:8px; }
+    .team-btn { width:100%; padding:18px; border:none; border-radius:16px; font-family:'Fredoka',sans-serif; font-size:1.3rem; font-weight:700; color:#fff; cursor:pointer; margin-bottom:10px; }
+    .team-btn.dark-text { color:#111; }
+    .p-team-badge { border-radius:16px; padding:12px 24px; font-family:'Fredoka',sans-serif; font-size:1.4rem; font-weight:700; }
+    .p-qmeta { font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; }
+    .p-question { font-family:'Fredoka',sans-serif; font-size:1.3rem; font-weight:700; text-align:center; line-height:1.3; margin:4px 0; }
+    .p-options { display:flex; flex-direction:column; gap:12px; width:100%; max-width:460px; }
+    .p-option { display:flex; align-items:center; gap:14px; width:100%; background:rgba(255,255,255,0.06); border:2px solid rgba(255,255,255,0.14); border-radius:16px; padding:18px; text-align:left; cursor:pointer; transition:all 0.15s; color:#fff; }
+    .p-option:active { transform:scale(0.98); }
+    .p-option-letter { width:40px; height:40px; flex-shrink:0; border-radius:10px; background:rgba(255,255,255,0.12); display:flex; align-items:center; justify-content:center; font-family:'Fredoka',sans-serif; font-weight:700; font-size:1.2rem; }
+    .p-option-text { font-size:1.1rem; font-weight:700; line-height:1.3; }
+    .p-option.chosen { border-color:#5856D6; background:rgba(88,86,214,0.25); }
+    .p-option.correct { border-color:#34C759; background:rgba(52,199,89,0.25); }
+    .p-option.correct .p-option-letter { background:#34C759; }
+    .p-option.wrong { border-color:#FF2D55; background:rgba(255,45,85,0.2); }
+    .p-option.locked { opacity:0.5; pointer-events:none; }
+    .p-locked-banner { font-family:'Fredoka',sans-serif; font-weight:700; color:#34C759; }
+    .p-result { font-family:'Fredoka',sans-serif; font-size:2rem; font-weight:700; }
+    .p-result.win { color:#34C759; } .p-result.lose { color:#FF2D55; }
+  </style>
+</head>
+<body>
+
+  <!-- JOIN -->
+  <div id="screen-join" class="screen active col center gap-16">
+    <div class="col center gap-8">
+      <a href="/" class="back-link">← Games Night</a>
+      <span style="font-size:3rem">🧠</span>
+      <h1 class="heading" style="font-size:2rem">Join Trivia</h1>
+    </div>
+    <div class="card col gap-12" style="max-width:380px">
+      <input type="text" id="input-name" placeholder="Your name" maxlength="20" autocomplete="off">
+      <input type="text" id="input-room" class="room-code-input" placeholder="CODE" maxlength="4" autocomplete="off" autocapitalize="characters">
+      <button class="btn btn-primary" id="btn-join">Join</button>
+      <div id="join-error" class="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- TEAM SELECT -->
+  <div id="screen-team-select" class="screen col center gap-12">
+    <h2 class="heading" style="font-size:1.5rem">Pick your team</h2>
+    <div id="team-buttons" style="width:100%;max-width:380px"></div>
+  </div>
+
+  <!-- WAITING -->
+  <div id="screen-waiting" class="screen col center gap-16">
+    <div class="p-team-badge" id="waiting-team-badge"></div>
+    <div style="font-size:2.4rem">🧠</div>
+    <h2 class="heading" style="font-size:1.6rem">You're in!</h2>
+    <p style="color:var(--text-muted)">Waiting for the host to start…</p>
+  </div>
+
+  <!-- QUESTION -->
+  <div id="screen-question" class="screen col center gap-12">
+    <div class="p-qmeta" id="p-qmeta"></div>
+    <div class="p-question" id="p-question"></div>
+    <div class="p-options" id="p-options"></div>
+    <div class="p-locked-banner" id="p-locked" style="display:none"></div>
+  </div>
+
+  <!-- REVEAL -->
+  <div id="screen-reveal" class="screen col center gap-14">
+    <div class="p-result" id="p-result"></div>
+    <div style="color:var(--text-muted)">Correct answer: <strong id="p-correct" style="color:#fff"></strong></div>
+    <div class="score-grid" id="p-scores" style="max-width:420px"></div>
+  </div>
+
+  <!-- ROUND OVER -->
+  <div id="screen-round-over" class="screen col center gap-14">
+    <div style="font-size:2rem">🏁</div>
+    <h2 class="heading" style="font-size:1.5rem">Round complete</h2>
+    <div class="leaderboard" id="p-ro-leaderboard" style="max-width:420px"></div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-16">
+    <div style="font-size:2.6rem">🏆</div>
+    <h2 class="heading" style="font-size:1.6rem">Final Scores</h2>
+    <div class="leaderboard" id="p-final-leaderboard" style="max-width:420px"></div>
+  </div>
+
+  <!-- HOST GONE -->
+  <div id="screen-host-gone" class="screen col center gap-12">
+    <div style="font-size:2.6rem">👋</div>
+    <h2 class="heading" style="font-size:1.4rem">Game ended</h2>
+    <p style="color:var(--text-muted)">The host closed the room.</p>
+    <button class="btn btn-ghost mt-8" onclick="location.href='/'">Back to Games Night</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/trivia/js/sounds.js"></script>
+  <script src="/games/trivia/js/player.js"></script>
+</body>
+</html>
