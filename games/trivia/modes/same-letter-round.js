@@ -38,22 +38,6 @@ const wordCount = a => stripArticle(a).split(/\s+/).filter(Boolean).length;
 // Questions that only make sense when you can see the options — not open recall.
 const isBadQ = q => /(which of these|which of the following|of the following|of these|which one of|all of the(se)?|none of the(se)?|following is|following are)/i.test(q);
 
-// Levenshtein distance (small strings only) for a little typo tolerance.
-function lev(a, b) {
-  if (a === b) return 0;
-  const m = a.length, n = b.length;
-  if (!m) return n; if (!n) return m;
-  let prev = Array.from({ length: n + 1 }, (_, i) => i);
-  for (let i = 1; i <= m; i++) {
-    const cur = [i];
-    for (let j = 1; j <= n; j++) {
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    }
-    prev = cur;
-  }
-  return prev[n];
-}
-
 // Acceptable normalised forms for a correct answer (the whole thing, and the part
 // before a comma — "Maine, United States" → also accept "Maine").
 function acceptableForms(correct) {
@@ -65,10 +49,12 @@ function acceptableForms(correct) {
 function isCorrect(raw, correct) {
   const p = gnorm(raw);
   if (!p) return false;
+  // Auto-accept ONLY on an exact match (ignoring case, punctuation and a leading
+  // "the/a/an"). No fuzzy/typo tolerance — the answer is specific, so "quatrillion"
+  // must NOT pass for "quadrillion". The host can still tap-to-accept a genuine
+  // misspelling at the reveal.
   for (const f of acceptableForms(correct)) {
     if (p === f) return true;
-    const tol = f.length <= 4 ? 0 : (f.length <= 7 ? 1 : 2);   // forgive typos on longer answers only
-    if (tol > 0 && lev(p, f) <= tol) return true;
   }
   return false;
 }

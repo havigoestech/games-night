@@ -16,6 +16,9 @@ const VOTE_SECONDS = 30;
 const MAX_LEN = 60;
 
 const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+// Display every option starting with a capital, so the real answer (which may be
+// stored lowercase) can't be spotted next to players' phone-autocapitalised fakes.
+const capFirst = s => { const t = String(s == null ? '' : s); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; };
 function shuffle(a) { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 module.exports = {
@@ -70,8 +73,8 @@ module.exports = {
       byNorm.get(f.norm).sources.push(pid);
     }
     let idc = 0;
-    const options = [{ id: 'o' + (idc++), text: m.truth, isTruth: true, sources: [] }];
-    for (const [, info] of byNorm) options.push({ id: 'o' + (idc++), text: info.text, isTruth: false, sources: info.sources });
+    const options = [{ id: 'o' + (idc++), text: capFirst(m.truth), isTruth: true, sources: [] }];
+    for (const [, info] of byNorm) options.push({ id: 'o' + (idc++), text: capFirst(info.text), isTruth: false, sources: info.sources });
     m.options = shuffle(options);
     m.stage = 'vote';
     return { mode: 'the-big-bluff', stage: 'vote', prompt: m.prompt, options: m.options.map(o => ({ id: o.id, text: o.text })), seconds: VOTE_SECONDS };
@@ -109,7 +112,7 @@ module.exports = {
       votes: (votesByOpt[o.id] || []).map(vid => (players.get(vid) || {}).name).filter(Boolean)
     }));
     const results = [...players.values()].sort((a, b) => b.points - a.points);
-    return { mode: 'the-big-bluff', prompt: m.prompt, truth: m.truth, options: revealOptions, results, roundPoints: perTeam };
+    return { mode: 'the-big-bluff', prompt: m.prompt, truth: capFirst(m.truth), options: revealOptions, results, roundPoints: perTeam };
   },
 
   youState(room, playerId) {

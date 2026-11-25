@@ -369,7 +369,7 @@ function lockInput(ms) {
 }
 
 socket.on('word-accepted', ({ word, pts, isTopWord, by, teamWords, buckets, roundPoints }) => {
-  Sounds.pointAwarded();
+  if (isTopWord) Sounds.topWord(); else Sounds.pointAwarded();
   renderWords(teamWords);
   renderBuckets(buckets);
   setTeamPoints(roundPoints);

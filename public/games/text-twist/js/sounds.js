@@ -89,6 +89,16 @@ const Sounds = {
     [523, 659, 784, 1047].forEach((f, i) => tone(f, 'sine', 0.5, t + i * 0.11, 0.35));
   },
 
+  // Extra-special fanfare for the TOP word (the one that uses EVERY letter) —
+  // clearly bigger and higher than the normal point chime, with a sparkle on top.
+  topWord() {
+    const c = ctx(); if (!c) return;
+    const t = c.currentTime;
+    [659, 880, 1109, 1319, 1760].forEach((f, i) => tone(f, 'triangle', 0.5, t + i * 0.08, 0.32));
+    tone(2093, 'sine', 0.32, t + 0.42, 0.5);
+    tone(2637, 'sine', 0.22, t + 0.50, 0.45);
+  },
+
   // Descending wah-wah for no point
   noPoint() {
     const c = ctx(); if (!c) return;

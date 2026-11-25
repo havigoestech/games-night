@@ -20,6 +20,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const stripArticle = s => String(s).trim().replace(/^(the|a|an)\s+/i, '');
 const firstLetterOf = s => { const w = stripArticle(s); const c = w.charAt(0); return /[a-z]/i.test(c) ? c.toUpperCase() : '?'; };
 const answerFor = qText => { const e = QUESTIONS.find(x => x.q === qText); return e ? e.correct : null; };
+const nearMiss = s => { const t = String(s); return t + (t.slice(-1).toLowerCase() === 'x' ? 'y' : 'x'); }; // one extra letter → edit distance 1, must NOT auto-pass
 
 function startServer() {
   return new Promise((resolve, reject) => {
@@ -75,14 +76,14 @@ async function main() {
     // Ada types the correct answer; Ben types gibberish. Both answered → auto-reveal.
     const revP = once(host, 'question-reveal');
     players.Ada.emit('submit', { answer: a1 });
-    players.Ben.emit('submit', { answer: 'zzqqxx' });
+    players.Ben.emit('submit', { answer: nearMiss(a1) });   // one letter off the real answer
     const rev1 = await revP;
     ok(rev1.mode === 'letter-trivia', 'reveal is the trivia-led reveal');
     ok(rev1.correct === a1, 'reveal shows the correct answer');
     const ada = (rev1.results || []).find(r => r.playerId === 'pa');
     const ben = (rev1.results || []).find(r => r.playerId === 'pb');
     ok(ada && ada.correct === true && ada.points > 0, 'typed-correct answer is auto-graded right and scores');
-    ok(ben && ben.correct === false && ben.points === 0, 'gibberish answer is auto-graded wrong, no points');
+    ok(ben && ben.correct === false && ben.points === 0, 'a one-letter-off answer is auto-graded WRONG — exact match only, no fuzzy typo pass (quatrillion ≠ quadrillion)');
     const score = n => (rev1.scores.find(s => s.name === n) || {}).score;
     ok(score('Reds') > 0, "Ada's team (Reds) got the points");
     ok(score('Blues') === 0, 'Blues have nothing yet');

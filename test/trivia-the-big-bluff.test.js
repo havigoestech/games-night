@@ -15,6 +15,7 @@ const ok = (c, l) => { if (c) { passed++; console.log('  ✅', l); } else { fail
 const conn = () => io(BASE, { transports: ['websocket'], forceNew: true, reconnection: false });
 const once = (s, ev, ms = 6000) => new Promise((res, rej) => { const t = setTimeout(() => rej(new Error('timeout: ' + ev)), ms); s.once(ev, d => { clearTimeout(t); res(d); }); });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const capFirst = s => { const t = String(s == null ? '' : s); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; };
 
 function startServer() {
   return new Promise((resolve, reject) => {
@@ -61,10 +62,11 @@ async function main() {
     players.Cal.emit('submit', { answer: truth });        // writes the real answer
     const vote = await voteH;                              // all 3 in → auto-advances to the vote
     ok(vote.stage === 'vote' && Array.isArray(vote.options) && vote.options.length >= 3, 'stage 2 is "vote" with the truth + fakes shuffled in');
-    const truthOpt = vote.options.find(o => o.text === truth);
+    const truthOpt = vote.options.find(o => o.text === capFirst(truth));
     const adaOpt = vote.options.find(o => o.text === 'Zebra fib');
     const benOpt = vote.options.find(o => o.text === 'Yak yarn');
     ok(truthOpt && adaOpt && benOpt, 'options contain the truth and both fakes');
+    ok(vote.options.every(o => !/^[a-z]/.test(String(o.text))), "every vote option starts with a capital — the real answer can't be spotted by a lowercase start");
 
     // can't vote your own fake
     const ackOwn = once(players.Ada, 'you-submitted');
@@ -77,7 +79,7 @@ async function main() {
     players.Ben.emit('submit', { optionId: adaOpt.id });     // Ben fooled by Ada (+250 Ada)
     players.Cal.emit('submit', { optionId: benOpt.id });     // Cal fooled by Ben (+250 Ben)
     const rev = await revH;                                  // all 3 voted → auto-scores
-    ok(rev.mode === 'the-big-bluff' && rev.truth === truth, 'reveal exposes the truth');
+    ok(rev.mode === 'the-big-bluff' && rev.truth === capFirst(truth), 'reveal exposes the truth');
     const adaRes = rev.results.find(r => r.name === 'Ada');
     ok(adaRes && adaRes.foundTruth && adaRes.points === 750, `Ada: found truth + fooled 1 = 750 (got ${adaRes && adaRes.points})`);
     const calRes = rev.results.find(r => r.name === 'Cal');
