@@ -233,16 +233,22 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
         const isLocalhost = baseUrl && /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(baseUrl);
         const playerBaseUrl = (!baseUrl || isLocalhost) ? `http://${localIP}:${port}` : baseUrl;
         const joinUrl = `${playerBaseUrl}/games/family-feud/player.html?room=${roomCode}`;
+        const boardUrl = `${playerBaseUrl}/games/family-feud/board.html?room=${roomCode}`;
 
         console.log('[family-feud] Room created:', roomCode);
 
         socket.emit('room-created', {
-          roomCode, joinUrl, localIP, port, teams: room.teams
+          roomCode, joinUrl, boardUrl, localIP, port, teams: room.teams
         });
 
         QRCode.toDataURL(joinUrl, { width: 200, margin: 1, color: { dark: '#ffffff', light: '#0a0a18' } })
           .then(qrDataUrl => socket.emit('qr-ready', { qrDataUrl }))
           .catch(e => console.error('[family-feud] QR error:', e.message));
+
+        // Second QR for the read-only TV board (opens on the iPad → mirror to TV).
+        QRCode.toDataURL(boardUrl, { width: 200, margin: 1, color: { dark: '#ffffff', light: '#0a0a18' } })
+          .then(qrDataUrl => socket.emit('board-qr-ready', { qrDataUrl }))
+          .catch(e => console.error('[family-feud] board QR error:', e.message));
 
       } catch (err) {
         console.error('[family-feud] create-room error:', err);
@@ -324,6 +330,24 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
     socket.on('request-sync', () => {
       const room = rooms.get(socket.roomCode);
       if (!room) return;
+      socket.emit('sync', snapshot(room));
+    });
+
+    // A read-only "TV board" display attaches here. It joins the room's
+    // broadcast channel to receive the PUBLIC (answer-less) feed, but is never
+    // a player: no teamIndex (so the buzz gate rejects it), no isHost (so its
+    // disconnect never deletes the room), and it's never added to the roster.
+    // Allowed in any phase — including game-over, so a post-game board can show
+    // the final leaderboard.
+    socket.on('watch-room', ({ roomCode }) => {
+      const code = (roomCode || '').toUpperCase().trim();
+      const room = rooms.get(code);
+      if (!room) {
+        socket.emit('watch-error', { message: 'Room not found. Check the code and try again.' });
+        return;
+      }
+      socket.join(code);
+      socket.roomCode = code;
       socket.emit('sync', snapshot(room));
     });
 

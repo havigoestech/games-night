@@ -467,6 +467,17 @@
         <img id="lobby-qr-img" width="160" height="160" alt="QR Code">
       </div>
     </div>
+
+    <!-- TV board: open this on the iPad and mirror it to the TV -->
+    <div id="board-share" style="display:none;text-align:center;background:rgba(88,86,214,0.12);border:1px solid rgba(88,86,214,0.35);border-radius:14px;padding:14px 16px;width:100%;max-width:520px">
+      <div class="section-label" style="margin-bottom:8px">📺 Put the board on your TV</div>
+      <div style="display:flex;align-items:center;gap:14px;justify-content:center;flex-wrap:wrap">
+        <div class="qr-wrap" id="board-qr" style="display:none"><img id="board-qr-img" width="120" height="120" alt="Board QR"></div>
+        <div style="font-size:0.78rem;color:var(--text-muted);word-break:break-all;max-width:320px;text-align:left" id="board-url"></div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px">Open on the iPad (scan or type the link), then mirror to the TV. It shows the board only — never the answers.</div>
+    </div>
+
     <div style="width:100%;max-width:520px">
       <div class="section-label mb-8">Players (<span id="player-count">0</span>)</div>
       <div class="player-groups" id="player-groups"></div>

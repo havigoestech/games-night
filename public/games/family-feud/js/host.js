@@ -70,7 +70,7 @@ document.getElementById('btn-create').addEventListener('click', () => {
 });
 
 // ── Lobby ──────────────────────────────────────────────────────
-socket.on('room-created', ({ roomCode, joinUrl, localIP, port, teams }) => {
+socket.on('room-created', ({ roomCode, joinUrl, boardUrl, localIP, port, teams }) => {
   document.getElementById('btn-create').textContent = 'Create Room';
   document.getElementById('btn-create').disabled = false;
   dbg('');
@@ -83,6 +83,11 @@ socket.on('room-created', ({ roomCode, joinUrl, localIP, port, teams }) => {
   const ipEl = document.getElementById('lobby-player-address');
   if (ipEl) ipEl.innerHTML = `Players go to: <strong>http://${localIP}:${port}</strong>`;
 
+  if (boardUrl) {
+    document.getElementById('board-url').textContent = boardUrl;
+    document.getElementById('board-share').style.display = 'block';
+  }
+
   renderPlayerGroups();
   showScreen('screen-lobby');
 });
@@ -91,6 +96,13 @@ socket.on('qr-ready', ({ qrDataUrl }) => {
   if (qrDataUrl) {
     document.getElementById('lobby-qr-img').src = qrDataUrl;
     document.getElementById('lobby-qr').style.display = 'block';
+  }
+});
+
+socket.on('board-qr-ready', ({ qrDataUrl }) => {
+  if (qrDataUrl) {
+    document.getElementById('board-qr-img').src = qrDataUrl;
+    document.getElementById('board-qr').style.display = 'block';
   }
 });
 
