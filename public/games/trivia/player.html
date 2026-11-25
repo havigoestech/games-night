@@ -14,6 +14,8 @@
     .team-btn.dark-text { color:#111; }
     .p-team-badge { border-radius:16px; padding:12px 24px; font-family:'Fredoka',sans-serif; font-size:1.4rem; font-weight:700; }
     .p-qmeta { font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; }
+    #p-topbar { position:fixed; top:0; left:0; right:0; z-index:50; text-align:center; padding:6px 12px; background:rgba(10,10,24,0.92); backdrop-filter:blur(8px); border-bottom:1px solid rgba(255,255,255,0.08); }
+    #p-topbar-mode { font-weight:700; font-size:0.9rem; color:#fff; }
     .p-question { font-family:'Fredoka',sans-serif; font-size:1.3rem; font-weight:700; text-align:center; line-height:1.3; margin:4px 0; }
     .p-options { display:flex; flex-direction:column; gap:12px; width:100%; max-width:460px; }
     .p-option { display:flex; align-items:center; gap:14px; width:100%; background:rgba(255,255,255,0.06); border:2px solid rgba(255,255,255,0.14); border-radius:16px; padding:18px; text-align:left; cursor:pointer; transition:all 0.15s; color:#fff; }
@@ -58,6 +60,9 @@
   </style>
 </head>
 <body>
+
+  <!-- Mode indicator (shown during questions) -->
+  <div id="p-topbar" style="display:none"><span id="p-topbar-mode"></span></div>
 
   <!-- JOIN -->
   <div id="screen-join" class="screen active col center gap-16">

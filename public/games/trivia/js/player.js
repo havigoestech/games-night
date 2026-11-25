@@ -24,7 +24,9 @@ let answered = false, myChoice = null, currentOptions = [];
 let slAnswers = [], slLetter = '', curMode = '', myBluff = '';
 
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); const el = document.getElementById(id); if (el) el.classList.add('active'); }
+const P_QUESTION_SCREENS = new Set(['screen-question', 'screen-question-sl', 'screen-question-cw', 'screen-question-bluff', 'screen-question-vote']);
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); const el = document.getElementById(id); if (el) el.classList.add('active'); const bar = document.getElementById('p-topbar'); if (bar) bar.style.display = P_QUESTION_SCREENS.has(id) ? 'block' : 'none'; }
+function setPlayerMode(d) { const mb = document.getElementById('p-topbar-mode'); if (mb && d && d.modeName) mb.textContent = `${d.modeIcon || ''} ${d.modeName}`.trim(); }
 function savedSession() { try { return JSON.parse(sessionStorage.getItem('trivia-session') || 'null'); } catch (e) { return null; } }
 function saveSession(rc) { try { sessionStorage.setItem('trivia-session', JSON.stringify({ roomCode: rc })); } catch (e) {} }
 function clearSession() { joinedRoomCode = null; try { sessionStorage.removeItem('trivia-session'); } catch (e) {} }
@@ -129,6 +131,7 @@ socket.on('you-submitted', (ack) => {
 });
 
 socket.on('question', (d) => {
+  setPlayerMode(d);
   if (d.mode === 'same-letter') showSLQuestion(d);
   else if (d.mode === 'closest-wins') showCWQuestion(d);
   else if (d.mode === 'the-big-bluff') showBBQuestion(d);
@@ -289,6 +292,7 @@ function applySnapshot(s) {
   if (!s) return;
   if (s.teamNames) teamNames = s.teamNames;
   if (s.teamColors) { teamColors = s.teamColors; myTeamColor = teamColors[myTeamIndex] || myTeamColor; }
+  if (s.roundMeta) setPlayerMode(s.roundMeta);
   switch (s.phase) {
     case 'question': {
       if (s.question && s.question.mode === 'same-letter') {

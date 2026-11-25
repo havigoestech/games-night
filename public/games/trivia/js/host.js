@@ -16,10 +16,18 @@ let currentScores = [];
 let allPlayers = [];
 let playlist = [{ mode: 'fastest-finger', category: 'any', difficulty: 'any', count: 5, seconds: 20 }];
 
+const QUESTION_SCREENS = new Set(['screen-question', 'screen-question-sl', 'screen-question-cw', 'screen-question-bluff', 'screen-question-vote', 'screen-reveal', 'screen-reveal-sl', 'screen-reveal-cw', 'screen-reveal-bluff']);
+const INGAME_SCREENS = new Set([...QUESTION_SCREENS, 'screen-round-intro', 'screen-round-over']);
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById(id);
   if (el) el.classList.add('active');
+  // Host control bar: visible during play; "Skip question" only while a question/reveal is up.
+  const bar = document.getElementById('host-topbar');
+  if (bar) bar.style.display = INGAME_SCREENS.has(id) ? 'flex' : 'none';
+  const sq = document.getElementById('btn-skip-q');
+  if (sq) sq.disabled = !QUESTION_SCREENS.has(id);
+  resetEndConfirm();
 }
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function dbg(m) { const el = document.getElementById('debug-log'); if (el) el.textContent = m; }
@@ -75,12 +83,17 @@ function renderPlaylist() {
         <div><label>Questions</label><input type="number" data-f="count" data-i="${i}" min="1" max="20" value="${r.count}"></div>
         <div><label>Seconds each</label><select data-f="seconds" data-i="${i}">${secondsOptions(r, [10, 15, 20, 30])}</select></div>`;
     } else {
-      const sl = r.mode === 'same-letter';
-      const note = sl ? 'Random category + letter each prompt. Type as many as you can — duplicates cancel.'
-                      : 'A numeric question each time — closest guess wins the most points.';
+      const isSL = r.mode === 'same-letter' || r.mode === 'same-letter-round';
+      const isBluff = r.mode === 'the-big-bluff';
+      let note;
+      if (r.mode === 'same-letter') note = 'Random category + letter each prompt. Type as many as you can — duplicates cancel.';
+      else if (r.mode === 'same-letter-round') note = 'ONE letter for the whole round (announced at the start); the category changes each question. Type as many as you can — duplicates cancel.';
+      else if (isBluff) note = 'Everyone writes a convincing fake answer, then picks the truth. Points for finding it — and for each player your fake fools.';
+      else note = 'A numeric question each time — closest guess wins the most points.';
+      const secVals = isSL ? [45, 60, 90, 120] : (isBluff ? [30, 45, 60] : [15, 20, 30, 45]);
       fields = `
-        <div><label>${sl ? 'Prompts' : 'Questions'}</label><input type="number" data-f="count" data-i="${i}" min="1" max="12" value="${r.count}"></div>
-        <div><label>Seconds each</label><select data-f="seconds" data-i="${i}">${secondsOptions(r, sl ? [45, 60, 90, 120] : [15, 20, 30, 45])}</select></div>
+        <div><label>${isSL ? 'Prompts' : 'Questions'}</label><input type="number" data-f="count" data-i="${i}" min="1" max="12" value="${r.count}"></div>
+        <div><label>Seconds each</label><select data-f="seconds" data-i="${i}">${secondsOptions(r, secVals)}</select></div>
         <div style="grid-column:1/-1;font-size:0.72rem;color:var(--text-muted)">${note}</div>`;
     }
     card.innerHTML = `
@@ -155,6 +168,26 @@ function renderPlayerGroups() {
 document.getElementById('btn-start-game').addEventListener('click', () => socket.emit('start-game'));
 document.getElementById('btn-end-game-lobby').addEventListener('click', () => socket.emit('end-game'));
 
+// ── Host control bar (mode indicator + skip/end controls) ──
+function setTopbarMode(d) {
+  const el = document.getElementById('topbar-mode');
+  if (el && d && d.modeName) el.textContent = `${d.modeIcon || ''} ${d.modeName}`.trim();
+}
+let endArmed = false;
+function resetEndConfirm() {
+  endArmed = false;
+  const b = document.getElementById('btn-end-game');
+  if (b) { b.classList.remove('confirm'); b.textContent = '⏹ End game'; }
+}
+document.getElementById('btn-skip-q').addEventListener('click', () => socket.emit('skip-question'));
+document.getElementById('btn-skip-round').addEventListener('click', () => socket.emit('skip-round'));
+document.getElementById('btn-end-game').addEventListener('click', () => {
+  const b = document.getElementById('btn-end-game');
+  if (!endArmed) { endArmed = true; b.classList.add('confirm'); b.textContent = 'Sure? End now'; return; }   // two-tap safety
+  socket.emit('end-game');
+  resetEndConfirm();
+});
+
 // ── Round intro ──
 socket.on('round-intro', (d) => {
   Sounds.go();
@@ -165,7 +198,9 @@ socket.on('round-intro', (d) => {
   if (d.difficulty && d.difficulty !== 'any') bits.push(d.difficulty);
   bits.push(`${d.count} questions`);
   document.getElementById('intro-detail').textContent = bits.join(' · ');
-  document.getElementById('btn-start-round').textContent = d.roundIndex === 0 ? 'Start Round' : 'Start Round';
+  const noteEl = document.getElementById('intro-note');
+  if (d.roundNote) { noteEl.textContent = d.roundNote; noteEl.style.display = 'block'; } else { noteEl.style.display = 'none'; }
+  setTopbarMode(d);
   showScreen('screen-round-intro');
 });
 document.getElementById('btn-start-round').addEventListener('click', () => socket.emit('advance'));
@@ -183,6 +218,7 @@ function renderOptions(container, options, opts = {}) {
   });
 }
 socket.on('question', (d) => {
+  setTopbarMode(d);
   if (d.mode === 'same-letter') showSLQuestion(d);
   else if (d.mode === 'closest-wins') showCWQuestion(d);
   else if (d.mode === 'the-big-bluff') showBBQuestion(d);
@@ -251,6 +287,7 @@ document.getElementById('btn-vote-reveal').addEventListener('click', () => socke
 
 // ── Reveal ──
 socket.on('question-reveal', (d) => {
+  setTopbarMode(d);
   if (d.mode === 'same-letter') showSLReveal(d);
   else if (d.mode === 'closest-wins') showCWReveal(d);
   else if (d.mode === 'the-big-bluff') showBBReveal(d);

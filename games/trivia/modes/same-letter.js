@@ -13,7 +13,7 @@ const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 // host (we flag, not reject — tons of valid answers are names/brands/places that
 // aren't in a dictionary). The host's tap-to-strike is the real gate.
 let DICT = null;
-try { DICT = require('../text-twist/puzzles').dictionary; } catch (e) { DICT = null; }
+try { DICT = require('../../text-twist/puzzles').dictionary; } catch (e) { DICT = null; }
 function isFlagged(text) {
   if (!DICT) return false;
   const words = norm(text).split(' ').filter(Boolean);

@@ -12,6 +12,7 @@ const ROOM_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MODES = {
   'fastest-finger': require('./modes/fastest-finger'),
   'same-letter': require('./modes/same-letter'),
+  'same-letter-round': require('./modes/same-letter-round'),
   'closest-wins': require('./modes/closest-wins'),
   'the-big-bluff': require('./modes/the-big-bluff'),
 };
@@ -126,7 +127,8 @@ module.exports = function registerTrivia(namespace, localIP, port) {
 
   function broadcastStage(room) {
     const round = currentRound(room);
-    namespace.to(room.roomCode).emit('question', { ...room.currentPublic, roundIndex: room.roundIndex, qNumber: room.qIndexInRound + 1, qCount: round.count, seconds: room.secondsLeft });
+    const mode = MODES[round.mode];
+    namespace.to(room.roomCode).emit('question', { ...room.currentPublic, roundIndex: room.roundIndex, qNumber: room.qIndexInRound + 1, qCount: round.count, seconds: room.secondsLeft, modeName: mode.meta.name, modeIcon: mode.meta.icon });
   }
 
   function beginQuestion(room) {
@@ -161,6 +163,8 @@ module.exports = function registerTrivia(namespace, localIP, port) {
     reveal.roundIndex = room.roundIndex;
     reveal.qNumber = room.qIndexInRound + 1;
     reveal.qCount = currentRound(room).count;
+    reveal.modeName = mode.meta.name;
+    reveal.modeIcon = mode.meta.icon;
     room.phase = 'question-reveal';
     room.currentReveal = reveal;
     namespace.to(room.roomCode).emit('question-reveal', reveal);
@@ -168,12 +172,15 @@ module.exports = function registerTrivia(namespace, localIP, port) {
 
   function emitRoundIntro(room) {
     const round = currentRound(room);
+    const mode = MODES[round.mode];
+    if (mode.startRound) mode.startRound(room, round);   // let a mode set up round-level state (e.g. a fixed letter)
     room.phase = 'round-intro';
     room.roundScoreBase = getScores(room).map(s => s.score);   // to compute this round's delta
     namespace.to(room.roomCode).emit('round-intro', {
       roundIndex: room.roundIndex, totalRounds: room.playlist.length,
-      modeName: MODES[round.mode].meta.name, modeIcon: MODES[round.mode].meta.icon,
-      category: round.category, difficulty: round.difficulty, count: round.count
+      modeName: mode.meta.name, modeIcon: mode.meta.icon,
+      category: round.category, difficulty: round.difficulty, count: round.count,
+      roundNote: round._roundNote || null
     });
   }
 
@@ -213,6 +220,24 @@ module.exports = function registerTrivia(namespace, localIP, port) {
       if (room.roundIndex + 1 < room.playlist.length) { room.roundIndex++; room.qIndexInRound = -1; emitRoundIntro(room); }
       else { endGame(room); }
     }
+  }
+
+  // Host "skip this question": abandon the current question (no scoring) and go
+  // straight to the next one, or to round-over if it was the last.
+  function skipQuestion(room) {
+    clearRoomTimer(room);
+    const round = currentRound(room);
+    if (!round) return;
+    if (room.qIndexInRound + 1 < round.count) { room.qIndexInRound++; beginQuestion(room); }
+    else { emitRoundOver(room); }
+  }
+
+  // Host "skip this round/mode": drop the rest of the current round and jump to
+  // the next round's intro, or end the game if it was the last round.
+  function skipRound(room) {
+    clearRoomTimer(room);
+    if (room.roundIndex + 1 < room.playlist.length) { room.roundIndex++; room.qIndexInRound = -1; emitRoundIntro(room); }
+    else { endGame(room); }
   }
 
   namespace.on('connection', (socket) => {
@@ -327,6 +352,21 @@ module.exports = function registerTrivia(namespace, localIP, port) {
       const room = rooms.get(socket.roomCode);
       if (!room || !socket.isHost) return;
       advance(room);
+    });
+
+    // Host in-game controls — available during active play (any question/round phase).
+    socket.on('skip-question', () => {
+      const room = rooms.get(socket.roomCode);
+      if (!room || !socket.isHost) return;
+      if (room.phase !== 'question' && room.phase !== 'question-reveal') return;
+      skipQuestion(room);
+    });
+
+    socket.on('skip-round', () => {
+      const room = rooms.get(socket.roomCode);
+      if (!room || !socket.isHost) return;
+      if (!['round-intro', 'question', 'question-reveal', 'round-over'].includes(room.phase)) return;
+      skipRound(room);
     });
 
     // Host adjusts a live reveal (e.g. Same Letter strike) — delegated to the mode.
