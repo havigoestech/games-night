@@ -224,11 +224,9 @@ input[type="text"]::placeholder { color: rgba(255,255,255,0.35); }
                                      scrollable) when content is taller than the
                                      screen — never trap the top off-screen */
   width: 100%;
-  /* divided by the display-size zoom (see boot.js) so one screen still fills
-     exactly one viewport when everything is enlarged, instead of overflowing */
-  height: calc(100vh / var(--gn-zoom, 1));   /* fallback for browsers without dvh */
-  height: calc(100dvh / var(--gn-zoom, 1));  /* visible viewport — excludes the mobile
-                      browser toolbar, so a screen's bottom is never stranded behind it */
+  height: 100vh;   /* fallback for browsers without dvh */
+  height: 100dvh;  /* visible viewport — excludes the mobile browser toolbar, so
+                      a screen's bottom is never stranded behind it */
   padding: 24px 20px;
   overflow-y: auto;
   text-align: center;
@@ -239,6 +237,33 @@ input[type="text"]::placeholder { color: rgba(255,255,255,0.35); }
   .score-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .screen { padding: 40px 32px; }
 }
+
+/* ── Fill-the-screen mode (display control, boot.js; default on) ──
+   Use the full width on a big display instead of a narrow centred column.
+   Shared containers here; per-game in-game wrappers are widened below. */
+html[data-gn-fill="1"] .card          { max-width: min(100%, 1500px); }
+html[data-gn-fill="1"] .score-grid    { max-width: min(100%, 1700px); }
+html[data-gn-fill="1"] .leaderboard,
+html[data-gn-fill="1"] .player-groups { max-width: min(100%, 1200px); }
+html[data-gn-fill="1"] .landing-btns  { max-width: min(100%, 760px); }
+/* per-game in-game wrappers (defined in each game's own <style>) */
+html[data-gn-fill="1"] .ff-game-inner,
+html[data-gn-fill="1"] .ff-round-over-inner,
+html[data-gn-fill="1"] .tt-inner,
+html[data-gn-fill="1"] .ro-inner,
+html[data-gn-fill="1"] .m-inner,
+html[data-gn-fill="1"] .o-inner,
+html[data-gn-fill="1"] .trv-game-inner { max-width: min(100%, 1500px); }
+@media (min-width: 900px) {
+  html[data-gn-fill="1"] .screen     { padding: 3vh 5vw; }
+  html[data-gn-fill="1"] .score-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+}
+
+/* ── Light mode ──
+   boot.js inverts the whole page at the root (works across every game without
+   per-screen surgery). Flip real raster images (QR codes) back so they stay
+   normal / scannable. */
+html[data-gn-light="1"] img { filter: invert(1) hue-rotate(180deg); }
 
 /* Attaching to an existing room (see /js/boot.js) — hold the screens back so the
    default one can't paint before the server tells us which is right. Silent for

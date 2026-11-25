@@ -6,6 +6,7 @@
   <title>Games Night</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="/js/boot.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -46,6 +47,9 @@
       max-width: 960px;
       margin: 0 auto;
     }
+    /* Fill-the-screen mode (display control in boot.js) — use the full width. */
+    html[data-gn-fill="1"] .games-grid { max-width: min(100%, 1600px); }
+    html[data-gn-fill="1"] body { padding-left: 4vw; padding-right: 4vw; }
 
     .game-card {
       background: rgba(255,255,255,0.05);
