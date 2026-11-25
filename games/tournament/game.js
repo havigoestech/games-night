@@ -20,6 +20,21 @@ const GAME_CATALOG = {
 
 const rooms = new Map();
 
+// Trivia can be configured per tournament round — the builder needs the category
+// list (from the MC bank) and the playable modes' meta.
+let TRIVIA_CATEGORIES = [];
+try {
+  const b = require('../trivia/data/questions-mc.js').QUESTIONS || [];
+  const seen = {}; b.forEach(q => { if (q && q.cat) seen[q.cat] = 1; });
+  TRIVIA_CATEGORIES = Object.keys(seen).sort();
+} catch (e) { TRIVIA_CATEGORIES = []; }
+let TRIVIA_MODES = [];
+try {
+  TRIVIA_MODES = ['fastest-finger', 'same-letter-round', 'closest-wins', 'the-big-bluff']
+    .map(function (k) { try { var m = require('../trivia/modes/' + k); return m && m.meta ? { key: m.meta.key, name: m.meta.name, icon: m.meta.icon } : null; } catch (e) { return null; } })
+    .filter(Boolean);
+} catch (e) { TRIVIA_MODES = []; }
+
 function generateRoomCode() {
   let code;
   do {
@@ -237,6 +252,9 @@ module.exports = function registerTournament(namespace, localIP, port) {
   }
 
   namespace.on('connection', (socket) => {
+
+    // Give the builder what it needs to configure trivia rounds.
+    socket.emit('tournament-meta', { triviaModes: TRIVIA_MODES, triviaCategories: TRIVIA_CATEGORIES });
 
     socket.on('create-tournament', ({ mode, teamCount, teamNames, plan, placement, baseUrl, hostId }) => {
       try {

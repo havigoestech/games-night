@@ -449,14 +449,25 @@ module.exports = function registerTrivia(namespace, localIP, port) {
       name: t.name, color: t.color || TEAM_COLORS[i % TEAM_COLORS.length], score: 0
     }));
     const count = Math.min(Math.max(parseInt(length) || 8, 1), 20);
+    // Per-tournament config: which mode, category, difficulty and timer this
+    // trivia round uses (sanitizePlaylist validates/clamps it all).
+    const cfg = config || {};
+    const tMode = MODES[cfg.mode] ? cfg.mode : 'fastest-finger';
+    const tRound = {
+      mode: tMode,
+      category: cfg.category || 'any',
+      difficulty: cfg.difficulty || 'any',
+      count,
+      seconds: parseInt(cfg.seconds) || MODES[tMode].meta.defaultSeconds
+    };
     const room = {
       roomCode,
       hostSocketId: null,
       teams: builtTeams,
       players: (roster || []).map(r => ({ socketId: null, playerId: r.playerId, name: r.name, teamIndex: r.teamIndex, connected: false })),
       teamMode: gameMode,
-      familyFriendly: true,
-      playlist: sanitizePlaylist([{ mode: 'fastest-finger', category: 'any', difficulty: 'any', count, seconds: 20 }]),
+      familyFriendly: cfg.familyFriendly !== false,
+      playlist: sanitizePlaylist([tRound]),
       phase: 'lobby',
       roundIndex: -1, qIndexInRound: -1,
       currentQuestion: null, modeState: null, currentPublic: null, currentReveal: null,
@@ -468,7 +479,7 @@ module.exports = function registerTrivia(namespace, localIP, port) {
       concluded: false
     };
     rooms.set(roomCode, room);
-    console.log('[trivia] tournament room', roomCode, '| mode:', gameMode, '| questions:', count, '| players:', room.players.length);
+    console.log('[trivia] tournament room', roomCode, '| mode:', gameMode, '| round:', tMode, '| questions:', count, '| players:', room.players.length);
     return { roomCode };
   });
 };

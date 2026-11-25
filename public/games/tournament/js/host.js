@@ -18,6 +18,13 @@ socket.on('connect', () => {
   if (returningRoom) socket.emit('reclaim-host', { roomCode: returningRoom, hostId: HOST_ID });
 });
 
+// Trivia modes + categories for the per-game settings panel.
+socket.on('tournament-meta', ({ triviaModes: tm, triviaCategories: tc }) => {
+  if (Array.isArray(tm)) triviaModes = tm;
+  if (Array.isArray(tc)) triviaCats = tc;
+  renderLineup();   // refresh now that trivia's options are known
+});
+
 // Mirror of the server's GAME_CATALOG — what can go in a line-up.
 const CATALOG = [
   { slug: 'grab-the-mic',    name: 'Grab the Mic', icon: '🎤', twoSided: false, lengthLabel: 'Play to',   lengthDefault: 10 },
@@ -27,11 +34,53 @@ const CATALOG = [
   { slug: 'trivia',          name: 'Trivia',       icon: '🧠', twoSided: false, lengthLabel: 'Questions', lengthDefault: 8 }
 ];
 
+// Per-game settings the host can tweak for each round. Keys match exactly what
+// each game's tournament launcher reads from `config`.
+const GAME_SETTINGS = {
+  'grab-the-mic': [
+    { key: 'singingTime',   label: 'Singing time',   def: '10', opts: [['8','8s'],['10','10s'],['12','12s'],['15','15s']] },
+    { key: 'buzzCountdown', label: 'Buzz countdown', def: '3',  opts: [['3','3s'],['5','5s'],['8','8s'],['10','10s']] }
+  ],
+  'family-feud': [
+    { key: 'faceoffSeconds', label: 'Face-off timer', def: '5',  opts: [['0','Off'],['3','3s'],['5','5s'],['8','8s'],['10','10s']] },
+    { key: 'playSeconds',    label: 'Play timer',     def: '10', opts: [['0','Off'],['8','8s'],['10','10s'],['15','15s'],['20','20s'],['30','30s']] }
+  ],
+  'text-twist': [
+    { key: 'difficulty',   label: 'Difficulty',  def: 'medium', opts: [['easy','Easy'],['medium','Medium'],['hard','Hard']] },
+    { key: 'roundSeconds', label: 'Round timer', def: '120',    opts: [['60','60s'],['90','90s'],['120','120s'],['180','180s']] }
+  ],
+  'kill-and-injury': [
+    { key: 'codeLength',   label: 'Code length', def: '4',  opts: [['3','3 digits'],['4','4 digits'],['5','5 digits']] },
+    { key: 'roundSeconds', label: 'Round timer', def: '60', opts: [['30','30s'],['45','45s'],['60','60s'],['90','90s']] }
+  ],
+  'trivia': [
+    { key: 'mode',       label: 'Mode',       def: 'fastest-finger', full: true, opts: 'MODES' },
+    { key: 'category',   label: 'Category',   def: 'any',            full: true, opts: 'CATS' },
+    { key: 'difficulty', label: 'Difficulty', def: 'any',  opts: [['any','Any'],['easy','Easy'],['medium','Medium'],['hard','Hard']] },
+    { key: 'seconds',    label: 'Timer',      def: '20',   opts: [['15','15s'],['20','20s'],['30','30s'],['45','45s']] }
+  ]
+};
+
+function settingsHtml(g, i) {
+  const defs = GAME_SETTINGS[g.slug] || [];
+  if (!defs.length) return '<div class="note">No extra settings — just the count above.</div>';
+  return defs.map(d => {
+    let opts = d.opts;
+    if (opts === 'MODES') opts = (triviaModes.length ? triviaModes.map(m => [m.key, (m.icon ? m.icon + ' ' : '') + m.name]) : [[d.def, 'Fastest Finger']]);
+    else if (opts === 'CATS') opts = [['any', 'Any category']].concat(triviaCats.map(c => [c, c]));
+    const cur = (g.config && g.config[d.key] != null) ? String(g.config[d.key]) : d.def;
+    const optionEls = opts.map(o => `<option value="${escapeHtml(String(o[0]))}"${String(o[0]) === cur ? ' selected' : ''}>${escapeHtml(String(o[1]))}</option>`).join('');
+    return `<label class="${d.full ? 'full' : ''}">${escapeHtml(d.label)}<select data-i="${i}" data-key="${escapeHtml(d.key)}">${optionEls}</select></label>`;
+  }).join('');
+}
+
 let teamCount = 2;
 let selectedMode = 'teams';
 let lineup = [];   // [{ slug, name, icon, twoSided, length }]
 let allPlayers = [];
 let standings = [];
+let triviaModes = [];   // [{key,name,icon}] from the server
+let triviaCats = [];    // trivia category names
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -90,7 +139,7 @@ function renderGamePicker() {
       <span class="add">+</span>
     `;
     btn.addEventListener('click', () => {
-      lineup.push({ slug: g.slug, name: g.name, icon: g.icon, twoSided: g.twoSided, length: g.lengthDefault, lengthLabel: g.lengthLabel });
+      lineup.push({ slug: g.slug, name: g.name, icon: g.icon, twoSided: g.twoSided, length: g.lengthDefault, lengthLabel: g.lengthLabel, config: {}, _open: false });
       renderLineup();
     });
     container.appendChild(btn);
@@ -99,22 +148,36 @@ function renderGamePicker() {
 
 function renderLineup() {
   const container = document.getElementById('lineup');
+  if (!container) return;
   container.innerHTML = '';
   lineup.forEach((g, i) => {
     const item = document.createElement('div');
     item.className = 'lineup-item';
+    const hasSettings = (GAME_SETTINGS[g.slug] || []).length > 0;
     item.innerHTML = `
-      <span class="num">${i + 1}</span>
-      <span class="gi">${g.icon}</span>
-      <span class="gn">${escapeHtml(g.name)}</span>
-      <span class="len-wrap">${g.lengthLabel}
-        <input type="number" class="len" min="1" max="50" value="${g.length}" id="len-${i}">
-      </span>
-      <span class="rm" title="Remove" data-i="${i}">×</span>
+      <div class="lineup-main">
+        <span class="num">${i + 1}</span>
+        <span class="gi">${g.icon}</span>
+        <span class="gn">${escapeHtml(g.name)}</span>
+        <span class="len-wrap">${g.lengthLabel}
+          <input type="number" class="len" min="1" max="50" value="${g.length}" id="len-${i}">
+        </span>
+        ${hasSettings ? `<button type="button" class="ln-gear${g._open ? ' on' : ''}" title="Game settings" data-i="${i}">⚙</button>` : ''}
+        <span class="rm" title="Remove" data-i="${i}">×</span>
+      </div>
+      ${hasSettings ? `<div class="lineup-settings" id="ln-set-${i}" style="display:${g._open ? 'grid' : 'none'}">${settingsHtml(g, i)}</div>` : ''}
     `;
     item.querySelector('.len').addEventListener('input', e => {
       const v = parseInt(e.target.value);
       g.length = isNaN(v) ? g.length : Math.min(Math.max(v, 1), 50);
+    });
+    const gear = item.querySelector('.ln-gear');
+    if (gear) gear.addEventListener('click', () => { g._open = !g._open; renderLineup(); });
+    item.querySelectorAll('.lineup-settings select').forEach(sel => {
+      sel.addEventListener('change', e => {
+        g.config = g.config || {};
+        g.config[e.target.dataset.key] = e.target.value;
+      });
     });
     item.querySelector('.rm').addEventListener('click', () => { lineup.splice(i, 1); renderLineup(); });
     container.appendChild(item);
@@ -167,7 +230,7 @@ document.getElementById('btn-create').addEventListener('click', () => {
     mode: selectedMode,
     teamCount,
     teamNames,
-    plan: lineup.map(g => ({ slug: g.slug, length: g.length, config: {} })),
+    plan: lineup.map(g => ({ slug: g.slug, length: g.length, config: g.config || {} })),
     placement: placeValues.slice(0, positions),
     baseUrl: `${location.protocol}//${location.host}`,
     hostId: HOST_ID

@@ -46,16 +46,25 @@
     #lineup { display: flex; flex-direction: column; gap: 8px; }
     #lineup:empty::after { content: 'No games added yet — pick from below.'; color: rgba(255,255,255,0.3); font-size: 0.85rem; font-weight: 600; }
     .lineup-item {
-      display: flex; align-items: center; gap: 10px;
+      display: flex; flex-direction: column; gap: 8px;
       padding: 10px 12px; border-radius: 12px;
       background: rgba(255,214,10,0.08); border: 1px solid rgba(255,214,10,0.3);
     }
+    .lineup-item .lineup-main { display: flex; align-items: center; gap: 10px; }
     .lineup-item .num { font-family: 'Fredoka', sans-serif; font-weight: 700; color: #FFD60A; width: 20px; }
     .lineup-item .gi { font-size: 1.3rem; }
     .lineup-item .gn { font-family: 'Fredoka', sans-serif; font-weight: 700; flex: 1; }
     .lineup-item .len-wrap { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 700; color: rgba(255,255,255,0.6); }
     .lineup-item input.len { width: 46px; padding: 5px 6px !important; font-size: 0.9rem !important; text-align: center; }
+    .lineup-item .ln-gear { background: none; border: none; cursor: pointer; font-size: 1.05rem; line-height: 1; padding: 0 2px; opacity: 0.65; }
+    .lineup-item .ln-gear:hover { opacity: 1; }
+    .lineup-item .ln-gear.on { opacity: 1; filter: drop-shadow(0 0 5px rgba(255,214,10,0.9)); }
     .lineup-item .rm { cursor: pointer; color: rgba(255,45,85,0.8); font-size: 1.3rem; font-weight: 700; padding: 0 4px; }
+    .lineup-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; border-radius: 10px; background: rgba(0,0,0,0.22); }
+    .lineup-settings label { display: flex; flex-direction: column; gap: 3px; font-size: 0.64rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255,255,255,0.5); text-align: left; }
+    .lineup-settings select { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-family: 'Nunito', sans-serif; font-size: 0.85rem; font-weight: 600; padding: 7px 8px; outline: none; }
+    .lineup-settings .full { grid-column: 1 / -1; }
+    .lineup-settings .note { grid-column: 1 / -1; font-size: 0.74rem; color: rgba(255,255,255,0.4); font-weight: 600; }
 
     /* Placement points */
     .place-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
