@@ -224,9 +224,11 @@ input[type="text"]::placeholder { color: rgba(255,255,255,0.35); }
                                      scrollable) when content is taller than the
                                      screen — never trap the top off-screen */
   width: 100%;
-  height: 100vh;   /* fallback for browsers without dvh */
-  height: 100dvh;  /* visible viewport — excludes the mobile browser toolbar, so
-                      a screen's bottom is never stranded behind it */
+  /* divided by the display-size zoom (see boot.js) so one screen still fills
+     exactly one viewport when everything is enlarged, instead of overflowing */
+  height: calc(100vh / var(--gn-zoom, 1));   /* fallback for browsers without dvh */
+  height: calc(100dvh / var(--gn-zoom, 1));  /* visible viewport — excludes the mobile
+                      browser toolbar, so a screen's bottom is never stranded behind it */
   padding: 24px 20px;
   overflow-y: auto;
   text-align: center;
