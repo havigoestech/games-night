@@ -16,7 +16,7 @@ let currentScores = [];
 let allPlayers = [];
 let playlist = [{ mode: 'fastest-finger', category: 'any', difficulty: 'any', count: 5, seconds: 20 }];
 
-const QUESTION_SCREENS = new Set(['screen-question', 'screen-question-sl', 'screen-question-cw', 'screen-question-bluff', 'screen-question-vote', 'screen-reveal', 'screen-reveal-sl', 'screen-reveal-cw', 'screen-reveal-bluff']);
+const QUESTION_SCREENS = new Set(['screen-question', 'screen-question-sl', 'screen-question-lt', 'screen-question-cw', 'screen-question-bluff', 'screen-question-vote', 'screen-reveal', 'screen-reveal-sl', 'screen-reveal-lt', 'screen-reveal-cw', 'screen-reveal-bluff']);
 const INGAME_SCREENS = new Set([...QUESTION_SCREENS, 'screen-round-intro', 'screen-round-over']);
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -83,16 +83,17 @@ function renderPlaylist() {
         <div><label>Questions</label><input type="number" data-f="count" data-i="${i}" min="1" max="20" value="${r.count}"></div>
         <div><label>Seconds each</label><select data-f="seconds" data-i="${i}">${secondsOptions(r, [10, 15, 20, 30])}</select></div>`;
     } else {
-      const isSL = r.mode === 'same-letter' || r.mode === 'same-letter-round';
       const isBluff = r.mode === 'the-big-bluff';
+      const isSLR = r.mode === 'same-letter-round';
       let note;
       if (r.mode === 'same-letter') note = 'Random category + letter each prompt. Type as many as you can — duplicates cancel.';
-      else if (r.mode === 'same-letter-round') note = 'ONE letter for the whole round (announced at the start); the category changes each question. Type as many as you can — duplicates cancel.';
+      else if (isSLR) note = 'ONE letter for the whole round (announced at the start). Each question is a specific trivia question whose answer starts with that letter — players type their answer.';
       else if (isBluff) note = 'Everyone writes a convincing fake answer, then picks the truth. Points for finding it — and for each player your fake fools.';
       else note = 'A numeric question each time — closest guess wins the most points.';
-      const secVals = isSL ? [45, 60, 90, 120] : (isBluff ? [30, 45, 60] : [15, 20, 30, 45]);
+      const secVals = isSLR ? [20, 30, 45, 60] : (r.mode === 'same-letter' ? [45, 60, 90, 120] : (isBluff ? [30, 45, 60] : [15, 20, 30, 45]));
+      const countLabel = (r.mode === 'same-letter') ? 'Prompts' : 'Questions';
       fields = `
-        <div><label>${isSL ? 'Prompts' : 'Questions'}</label><input type="number" data-f="count" data-i="${i}" min="1" max="12" value="${r.count}"></div>
+        <div><label>${countLabel}</label><input type="number" data-f="count" data-i="${i}" min="1" max="12" value="${r.count}"></div>
         <div><label>Seconds each</label><select data-f="seconds" data-i="${i}">${secondsOptions(r, secVals)}</select></div>
         <div style="grid-column:1/-1;font-size:0.72rem;color:var(--text-muted)">${note}</div>`;
     }
@@ -220,6 +221,7 @@ function renderOptions(container, options, opts = {}) {
 socket.on('question', (d) => {
   setTopbarMode(d);
   if (d.mode === 'same-letter') showSLQuestion(d);
+  else if (d.mode === 'letter-trivia') showLTQuestion(d);
   else if (d.mode === 'closest-wins') showCWQuestion(d);
   else if (d.mode === 'the-big-bluff') showBBQuestion(d);
   else showFFQuestion(d);
@@ -268,12 +270,23 @@ function showSLQuestion(d) {
   document.getElementById('q-sl-progress').textContent = 'Players are typing…';
   showScreen('screen-question-sl');
 }
+function showLTQuestion(d) {
+  Sounds.wordReveal();
+  document.getElementById('q-lt-cat').textContent = d.category || '';
+  document.getElementById('q-lt-num').textContent = `Question ${d.qNumber} of ${d.qCount}`;
+  document.getElementById('q-lt-letter').textContent = d.letter;
+  document.getElementById('q-lt-question').textContent = d.question;
+  const t = document.getElementById('q-lt-timer'); t.textContent = d.seconds; t.classList.remove('low');
+  document.getElementById('q-lt-progress').textContent = `0 / ${allPlayers.filter(p => p.connected).length} answered`;
+  showScreen('screen-question-lt');
+}
 socket.on('timer', ({ secondsLeft }) => {
-  ['q-timer', 'q-sl-timer', 'q-cw-timer', 'q-bb-timer', 'q-vote-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
+  ['q-timer', 'q-sl-timer', 'q-lt-timer', 'q-cw-timer', 'q-bb-timer', 'q-vote-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
   if (secondsLeft <= 5 && secondsLeft > 0) Sounds.tick();
 });
 socket.on('answer-progress', ({ answered, total }) => {
   const ff = document.getElementById('q-progress'); if (ff) ff.textContent = `${answered} / ${total} answered`;
+  const lt = document.getElementById('q-lt-progress'); if (lt) lt.textContent = `${answered} / ${total} answered`;
   const sl = document.getElementById('q-sl-progress'); if (sl) sl.textContent = `${answered} of ${total} players answering…`;
   const cw = document.getElementById('q-cw-progress'); if (cw) cw.textContent = `${answered} of ${total} players guessing…`;
   const bb = document.getElementById('q-bb-progress'); if (bb) bb.textContent = `${answered} of ${total} wrote a bluff`;
@@ -281,6 +294,7 @@ socket.on('answer-progress', ({ answered, total }) => {
 });
 document.getElementById('btn-reveal').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-reveal-sl').addEventListener('click', () => socket.emit('advance'));
+document.getElementById('btn-reveal-lt').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-reveal-cw').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-bb-to-vote').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-vote-reveal').addEventListener('click', () => socket.emit('advance'));
@@ -289,6 +303,7 @@ document.getElementById('btn-vote-reveal').addEventListener('click', () => socke
 socket.on('question-reveal', (d) => {
   setTopbarMode(d);
   if (d.mode === 'same-letter') showSLReveal(d);
+  else if (d.mode === 'letter-trivia') showLTReveal(d);
   else if (d.mode === 'closest-wins') showCWReveal(d);
   else if (d.mode === 'the-big-bluff') showBBReveal(d);
   else showFFReveal(d);
@@ -339,6 +354,25 @@ function showSLReveal(d) {
   renderScoreCards('reveal-sl-scores', d.scores);
   showScreen('screen-reveal-sl');
 }
+function showLTReveal(d) {
+  Sounds.pointAwarded();
+  document.getElementById('reveal-lt-sub').innerHTML = `✅ <strong>${escapeHtml(d.correct)}</strong> &nbsp;·&nbsp; <span style="font-size:0.72rem;color:var(--text-muted);font-weight:600">tap an answer to mark it correct</span>`;
+  document.getElementById('reveal-lt-question').textContent = d.question;
+  const box = document.getElementById('reveal-lt-answers'); box.innerHTML = '';
+  (d.results || []).forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'lt-answer-row' + (r.correct ? ' correct' : '');
+    row.style.cursor = 'pointer';
+    row.title = 'Tap to ' + (r.correct ? 'un-accept' : 'accept') + ' this answer';
+    row.innerHTML = `<span class="lt-answer-mark">${r.correct ? '✓' : '✗'}</span><span class="lt-answer-name">${escapeHtml(r.name)}</span><span class="lt-answer-ans">${escapeHtml(r.answer)}</span><span class="lt-answer-pts${r.points > 0 ? '' : ' zero'}">${r.points > 0 ? '+' + r.points : '—'}</span>`;
+    row.addEventListener('click', () => socket.emit('host-action', { type: 'accept', playerId: r.playerId }));
+    box.appendChild(row);
+  });
+  if (!(d.results || []).length) box.innerHTML = '<div style="color:var(--text-muted)">No answers this question!</div>';
+  currentScores = d.scores;
+  renderScoreCards('reveal-lt-scores', d.scores);
+  showScreen('screen-reveal-lt');
+}
 function showCWReveal(d) {
   Sounds.pointAwarded();
   document.getElementById('reveal-cw-q').textContent = d.question;
@@ -357,6 +391,7 @@ function showCWReveal(d) {
 }
 document.getElementById('btn-next').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-next-sl').addEventListener('click', () => socket.emit('advance'));
+document.getElementById('btn-next-lt').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-next-cw').addEventListener('click', () => socket.emit('advance'));
 document.getElementById('btn-next-bb').addEventListener('click', () => socket.emit('advance'));
 

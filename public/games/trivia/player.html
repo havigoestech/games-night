@@ -130,6 +130,26 @@
     <div class="score-grid" id="p-sl-scores" style="max-width:420px"></div>
   </div>
 
+  <!-- QUESTION (Same Letter · Round — trivia-led) -->
+  <div id="screen-question-lt" class="screen col center gap-12">
+    <div class="p-qmeta" id="p-lt-meta"></div>
+    <div class="sl-big-letter" id="p-lt-letter">L</div>
+    <div class="p-question" id="p-lt-question"></div>
+    <div class="p-sl-timer" id="p-lt-timer">30</div>
+    <div class="sl-input-row">
+      <input type="text" id="p-lt-input" placeholder="Type your answer…" autocomplete="off" autocapitalize="words" maxlength="40">
+      <button class="btn btn-primary" id="p-lt-add" style="width:auto;padding:12px 20px">Submit</button>
+    </div>
+    <div class="cw-your-guess" id="p-lt-your"></div>
+  </div>
+
+  <!-- REVEAL (Same Letter · Round — trivia-led) -->
+  <div id="screen-reveal-lt" class="screen col center gap-12">
+    <div class="p-result" id="p-lt-result"></div>
+    <div style="color:var(--text-muted)">Answer: <strong id="p-lt-correct" style="color:#34C759"></strong></div>
+    <div class="score-grid" id="p-lt-scores" style="max-width:420px"></div>
+  </div>
+
   <!-- QUESTION (Closest Wins) -->
   <div id="screen-question-cw" class="screen col center gap-12">
     <div class="p-qmeta" id="p-cw-meta"></div>

@@ -24,7 +24,7 @@ let answered = false, myChoice = null, currentOptions = [];
 let slAnswers = [], slLetter = '', curMode = '', myBluff = '';
 
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-const P_QUESTION_SCREENS = new Set(['screen-question', 'screen-question-sl', 'screen-question-cw', 'screen-question-bluff', 'screen-question-vote']);
+const P_QUESTION_SCREENS = new Set(['screen-question', 'screen-question-sl', 'screen-question-lt', 'screen-question-cw', 'screen-question-bluff', 'screen-question-vote']);
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); const el = document.getElementById(id); if (el) el.classList.add('active'); const bar = document.getElementById('p-topbar'); if (bar) bar.style.display = P_QUESTION_SCREENS.has(id) ? 'block' : 'none'; }
 function setPlayerMode(d) { const mb = document.getElementById('p-topbar-mode'); if (mb && d && d.modeName) mb.textContent = `${d.modeIcon || ''} ${d.modeName}`.trim(); }
 function savedSession() { try { return JSON.parse(sessionStorage.getItem('trivia-session') || 'null'); } catch (e) { return null; } }
@@ -117,6 +117,13 @@ socket.on('you-submitted', (ack) => {
     const el = document.getElementById('p-cw-your');
     if (ack && ack.accepted) { el.textContent = `Your guess: ${ack.value} ✓`; Sounds.pointAwarded(); }
     else el.textContent = 'Enter a number!';
+  } else if (curMode === 'letter-trivia') {
+    if (ack && ack.received) {
+      document.getElementById('p-lt-your').textContent = `Locked in: ${ack.answer} ✓`;
+      const inp = document.getElementById('p-lt-input'); if (inp) inp.disabled = true;
+      document.getElementById('p-lt-add').disabled = true;
+      Sounds.pointAwarded();
+    }
   } else if (curMode === 'the-big-bluff') {
     if (!ack) return;
     if (ack.stage === 'bluff') {
@@ -133,6 +140,7 @@ socket.on('you-submitted', (ack) => {
 socket.on('question', (d) => {
   setPlayerMode(d);
   if (d.mode === 'same-letter') showSLQuestion(d);
+  else if (d.mode === 'letter-trivia') showLTQuestion(d);
   else if (d.mode === 'closest-wins') showCWQuestion(d);
   else if (d.mode === 'the-big-bluff') showBBQuestion(d);
   else showFFQuestion(d);
@@ -222,16 +230,46 @@ function slSubmit() {
 }
 document.getElementById('p-sl-add').addEventListener('click', slSubmit);
 document.getElementById('p-sl-input').addEventListener('keydown', e => { if (e.key === 'Enter') slSubmit(); });
+function showLTQuestion(d) {
+  curMode = 'letter-trivia';
+  document.getElementById('p-lt-meta').textContent = `Question ${d.qNumber} of ${d.qCount}`;
+  document.getElementById('p-lt-letter').textContent = d.letter;
+  document.getElementById('p-lt-question').textContent = d.question;
+  document.getElementById('p-lt-timer').textContent = d.seconds != null ? d.seconds : '';
+  const inp = document.getElementById('p-lt-input'); inp.value = ''; inp.disabled = false;
+  document.getElementById('p-lt-add').disabled = false;
+  document.getElementById('p-lt-your').textContent = '';
+  showScreen('screen-question-lt');
+  setTimeout(() => { if (inp) inp.focus(); }, 60);
+}
+function ltSubmit() {
+  const inp = document.getElementById('p-lt-input'); const v = inp.value.trim();
+  if (!v) return;
+  socket.emit('submit', { answer: v });
+}
+document.getElementById('p-lt-add').addEventListener('click', ltSubmit);
+document.getElementById('p-lt-input').addEventListener('keydown', e => { if (e.key === 'Enter') ltSubmit(); });
 socket.on('timer', ({ secondsLeft }) => {
-  ['p-sl-timer', 'p-cw-timer', 'p-bb-timer', 'p-vote-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
+  ['p-sl-timer', 'p-lt-timer', 'p-cw-timer', 'p-bb-timer', 'p-vote-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
 });
 
 socket.on('question-reveal', (d) => {
   if (d.mode === 'same-letter') showSLReveal(d, slAnswers);
+  else if (d.mode === 'letter-trivia') showLTReveal(d);
   else if (d.mode === 'closest-wins') showCWReveal(d);
   else if (d.mode === 'the-big-bluff') showBBReveal(d);
   else showFFReveal(d);
 });
+function showLTReveal(d) {
+  const mine = (d.results || []).find(r => r.playerId === playerId);
+  const res = document.getElementById('p-lt-result');
+  if (mine && mine.correct) { res.textContent = `Correct! +${mine.points}`; res.className = 'p-result win'; Sounds.pointAwarded(); }
+  else if (mine) { res.textContent = `You said “${mine.answer}” 😬`; res.className = 'p-result lose'; Sounds.noPoint(); }
+  else { res.textContent = "Time's up ⏱"; res.className = 'p-result lose'; Sounds.noPoint(); }
+  document.getElementById('p-lt-correct').textContent = d.correct;
+  renderScoreCards('p-lt-scores', d.scores);
+  showScreen('screen-reveal-lt');
+}
 function showBBReveal(d) {
   const mine = (d.results || []).find(r => r.playerId === playerId);
   const res = document.getElementById('p-bb-result');
@@ -299,6 +337,13 @@ function applySnapshot(s) {
         showSLQuestion({ ...s.question, qNumber: s.qNumber, qCount: s.qCount, seconds: s.secondsLeft });
         slAnswers = (s.you && s.you.answers) || [];
         renderSLList();
+      } else if (s.question && s.question.mode === 'letter-trivia') {
+        showLTQuestion({ ...s.question, qNumber: s.qNumber, qCount: s.qCount, seconds: s.secondsLeft });
+        if (s.you && s.you.answered) {
+          document.getElementById('p-lt-your').textContent = `Locked in: ${s.you.answer} ✓`;
+          const inp = document.getElementById('p-lt-input'); if (inp) inp.disabled = true;
+          document.getElementById('p-lt-add').disabled = true;
+        }
       } else if (s.question && s.question.mode === 'closest-wins') {
         showCWQuestion({ ...s.question, qNumber: s.qNumber, qCount: s.qCount, seconds: s.secondsLeft });
         if (s.you && s.you.value != null) { document.getElementById('p-cw-input').value = s.you.value; document.getElementById('p-cw-your').textContent = `Your guess: ${s.you.value} ✓`; }
@@ -323,6 +368,8 @@ function applySnapshot(s) {
     case 'question-reveal': {
       if (s.reveal && s.reveal.mode === 'same-letter') {
         showSLReveal(s.reveal, (s.you && s.you.answers) || slAnswers);
+      } else if (s.reveal && s.reveal.mode === 'letter-trivia') {
+        showLTReveal(s.reveal);
       } else if (s.reveal && s.reveal.mode === 'closest-wins') {
         showCWReveal(s.reveal);
       } else if (s.reveal && s.reveal.mode === 'the-big-bluff') {
