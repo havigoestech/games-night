@@ -1,11 +1,27 @@
 let _ctx = null;
+let _unlocked = false;
 
 function ctx() {
   if (!_ctx) {
     try { _ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
   }
-  if (_ctx.state === 'suspended') _ctx.resume();
+  if (_ctx.state === 'suspended') { try { _ctx.resume(); } catch (e) {} }
   return _ctx;
+}
+
+// iOS/Safari fully unlocks Web Audio only when a buffer is played inside a user
+// gesture, and it re-suspends the AudioContext whenever the screen locks or the
+// tab backgrounds (so an iPad left on the game screen goes silent). Resume it on
+// EVERY gesture and whenever the page becomes visible again — cheap and reliable.
+function _kick() {
+  const c = ctx(); if (!c) return;
+  if (!_unlocked) {
+    try { const b = c.createBuffer(1, 1, 22050); const s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); _unlocked = true; } catch (e) {}
+  }
+}
+if (typeof window !== 'undefined') {
+  ['pointerdown', 'touchend', 'mousedown', 'keydown'].forEach(ev => window.addEventListener(ev, _kick, { capture: true, passive: true }));
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') ctx(); });
 }
 
 function tone(freq, type, vol, t0, dur, endFreq) {
@@ -25,7 +41,7 @@ function tone(freq, type, vol, t0, dur, endFreq) {
 
 const Sounds = {
   // Call this inside the first user interaction to unlock audio on iOS/Safari
-  unlockAudio() { ctx(); },
+  unlockAudio() { _kick(); },
 
   // Harsh game-show buzzer
   buzz() {

@@ -321,7 +321,7 @@ function showSLReveal(d, myAnswers) {
   showScreen('screen-reveal-sl');
 }
 
-socket.on('round-over', (d) => { Sounds.go(); renderLeaderboard('p-ro-leaderboard', d.scores); showScreen('screen-round-over'); });
+socket.on('round-over', (d) => { Sounds.go(); renderRoundLeaderboard('p-ro-leaderboard', d.roundScores || d.scores); showScreen('screen-round-over'); });
 socket.on('game-over', ({ scores }) => { Sounds.gameOver(); clearSession(); renderLeaderboard('p-final-leaderboard', scores); showScreen('screen-game-over'); if (TOURNEY) setTimeout(() => { location.href = `/games/tournament/player.html?room=${TOURNEY.t}`; }, 3500); });
 socket.on('host-disconnected', () => { clearSession(); showScreen('screen-host-gone'); });
 
@@ -386,7 +386,7 @@ function applySnapshot(s) {
       } else { showScreen('screen-reveal'); }
       break;
     }
-    case 'round-over': renderLeaderboard('p-ro-leaderboard', s.scores); showScreen('screen-round-over'); break;
+    case 'round-over': renderRoundLeaderboard('p-ro-leaderboard', s.roundScores || s.scores); showScreen('screen-round-over'); break;
     case 'game-over': renderLeaderboard('p-final-leaderboard', s.scores); showScreen('screen-game-over'); break;
     default: showScreen('screen-waiting');
   }
@@ -400,4 +400,17 @@ function renderScoreCards(id, scores) {
 function renderLeaderboard(id, scores) {
   const c = document.getElementById(id); if (!c || !scores) return; c.innerHTML = '';
   [...scores].sort((a, b) => b.score - a.score).forEach((s, i) => { const w = i === 0; const row = document.createElement('div'); row.className = `lb-row${w ? ' winner' : ''}`; if (w) row.style.cssText = `background:${s.color}22;border-color:${s.color}`; row.innerHTML = `<div class="lb-rank">${w ? '👑' : i + 1}</div><div class="lb-name" style="color:${s.color}">${escapeHtml(s.name)}</div><div class="lb-score">${s.score}</div>`; c.appendChild(row); });
+}
+// Round-over leaderboard: adds each player/team's points gained THIS round.
+function renderRoundLeaderboard(id, rows) {
+  const c = document.getElementById(id); if (!c || !rows) return; c.innerHTML = '';
+  [...rows].sort((a, b) => b.score - a.score).forEach((s, i) => {
+    const w = i === 0;
+    const row = document.createElement('div');
+    row.className = `lb-row${w ? ' winner' : ''}`;
+    if (w) row.style.cssText = `background:${s.color}22;border-color:${s.color}`;
+    const delta = (s.roundPoints != null) ? `<div class="lb-delta">+${s.roundPoints}</div>` : '';
+    row.innerHTML = `<div class="lb-rank">${w ? '👑' : i + 1}</div><div class="lb-name" style="color:${s.color}">${escapeHtml(s.name)}</div>${delta}<div class="lb-score">${s.score}</div>`;
+    c.appendChild(row);
+  });
 }

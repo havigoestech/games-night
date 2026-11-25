@@ -400,7 +400,7 @@ socket.on('round-over', (d) => {
   Sounds.go();
   document.getElementById('ro-title').textContent = `Round ${d.roundIndex + 1} complete`;
   currentScores = d.scores;
-  renderLeaderboard('ro-leaderboard', d.scores);
+  renderRoundLeaderboard('ro-leaderboard', d.roundScores || d.scores);
   const last = d.roundIndex + 1 >= d.totalRounds;
   document.getElementById('btn-next-round').textContent = last ? 'See Final Scores' : 'Next Round';
   showScreen('screen-round-over');
@@ -438,6 +438,20 @@ function renderScoreCards(id, scores) {
 function renderLeaderboard(id, scores) {
   const c = document.getElementById(id); if (!c || !scores) return; c.innerHTML = '';
   [...scores].sort((a, b) => b.score - a.score).forEach((s, i) => { const w = i === 0; const row = document.createElement('div'); row.className = `lb-row${w ? ' winner' : ''}`; if (w) row.style.cssText = `background:${s.color}22;border-color:${s.color}`; row.innerHTML = `<div class="lb-rank">${w ? '👑' : i + 1}</div><div class="lb-name" style="color:${s.color}">${escapeHtml(s.name)}</div><div class="lb-score">${s.score}</div>`; c.appendChild(row); });
+}
+// Round-over leaderboard: like the leaderboard, but with each team/player's
+// points gained THIS round shown as a green "+N" badge next to their total.
+function renderRoundLeaderboard(id, rows) {
+  const c = document.getElementById(id); if (!c || !rows) return; c.innerHTML = '';
+  [...rows].sort((a, b) => b.score - a.score).forEach((s, i) => {
+    const w = i === 0;
+    const row = document.createElement('div');
+    row.className = `lb-row${w ? ' winner' : ''}`;
+    if (w) row.style.cssText = `background:${s.color}22;border-color:${s.color}`;
+    const delta = (s.roundPoints != null) ? `<div class="lb-delta">+${s.roundPoints}</div>` : '';
+    row.innerHTML = `<div class="lb-rank">${w ? '👑' : i + 1}</div><div class="lb-name" style="color:${s.color}">${escapeHtml(s.name)}</div>${delta}<div class="lb-score">${s.score}</div>`;
+    c.appendChild(row);
+  });
 }
 // Per-player points for a single question/round, so the maths is visible.
 function renderScorers(id, results, detailFn) {
