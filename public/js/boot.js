@@ -49,6 +49,7 @@
         '<input type="range" id="gn-bright" min="55" max="105" style="' + rng + '">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px"><span style="' + lbl + '">Text size</span><span style="display:flex;gap:6px"><button type="button" id="gn-td" style="' + sBtn + '">A−</button><span id="gn-text-v" style="min-width:44px;text-align:center;align-self:center;font-weight:800;font-size:0.82rem;color:#fff"></span><button type="button" id="gn-tu" style="' + sBtn + '">A+</button></span></div>' +
         '<label style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;font-size:0.9rem;font-weight:700;color:#fff"><span>Fill the screen</span><input type="checkbox" id="gn-fill" style="width:20px;height:20px;accent-color:#34C759;cursor:pointer"></label>' +
+        '<button type="button" id="gn-fs" style="width:100%;margin-top:12px;padding:9px;border:none;border-radius:9px;background:rgba(255,255,255,0.1);color:#fff;font-weight:700;font-size:0.9rem;cursor:pointer">⛶ Full screen</button>' +
       '</div>';
     (document.body || document.documentElement).appendChild(wrap);
 
@@ -80,6 +81,15 @@
     function step(d) { var c = num('gn-text', 100), i = TEXT.indexOf(c); if (i < 0) i = 0; i = Math.max(0, Math.min(TEXT.length - 1, i + d)); ls.set('gn-text', String(TEXT[i])); document.getElementById('gn-text-v').textContent = TEXT[i] + '%'; apply(); }
     document.getElementById('gn-td').addEventListener('click', function () { step(-1); });
     document.getElementById('gn-tu').addEventListener('click', function () { step(1); });
+    // Full screen (the host shares a desktop; Esc exits — the browser's own behaviour).
+    var fsBtn = document.getElementById('gn-fs');
+    function fsLabel() { fsBtn.textContent = document.fullscreenElement ? '⛶ Exit full screen' : '⛶ Full screen'; }
+    fsBtn.addEventListener('click', function () {
+      if (document.fullscreenElement) { if (document.exitFullscreen) document.exitFullscreen(); }
+      else { var el = document.documentElement, rf = el.requestFullscreen || el.webkitRequestFullscreen; if (rf) { try { rf.call(el); } catch (e) {} } }
+    });
+    document.addEventListener('fullscreenchange', fsLabel);
+    fsLabel();
     sync();
   }
   if (!/\/player\.html$/.test(location.pathname)) {
