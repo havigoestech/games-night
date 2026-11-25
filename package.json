@@ -10,6 +10,7 @@
     "test:ff-data": "node test/family-feud-data.test.js",
     "test:trivia": "node test/trivia-fastest-finger.test.js",
     "test:trivia-data": "node test/trivia-data.test.js",
+    "test:trivia-sl": "node test/trivia-same-letter.test.js",
     "test:tt": "node test/text-twist.test.js",
     "test:ki": "node test/kill-and-injury.test.js",
     "test:tourney": "node test/tournament.test.js",

@@ -58,6 +58,16 @@
     .trv-option-count { margin-left:auto; font-family:'Fredoka',sans-serif; font-weight:700; color:var(--text-muted); flex-shrink:0; }
     .trv-progress { font-size:0.95rem; font-weight:700; color:var(--text-muted); }
     .trv-reveal-sub { font-family:'Fredoka',sans-serif; font-size:1.2rem; font-weight:700; }
+
+    /* Same Letter */
+    .sl-prompt { font-family:'Fredoka',sans-serif; font-size:clamp(1.4rem,4vw,2.2rem); font-weight:700; text-align:center; }
+    .sl-letter { display:inline-flex; align-items:center; justify-content:center; min-width:1.4em; padding:0 0.2em; border-radius:14px; background:linear-gradient(135deg,#BF5AF2,#00C7BE); color:#fff; }
+    .sl-groups { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:100%; max-width:760px; max-height:320px; overflow-y:auto; }
+    .sl-chip { padding:8px 14px; border-radius:12px; font-weight:700; font-size:0.95rem; border:1px solid transparent; }
+    .sl-chip.scored { background:rgba(52,199,89,0.18); border-color:#34C759; color:#fff; }
+    .sl-chip.cancelled { background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.12); color:var(--text-muted); }
+    .sl-chip.cancelled .txt { text-decoration:line-through; }
+    .sl-chip .who { font-weight:600; font-size:0.78rem; opacity:0.7; margin-left:6px; }
   </style>
 </head>
 <body>
@@ -147,6 +157,27 @@
       <div class="trv-options" id="reveal-options"></div>
       <div style="width:100%"><div class="section-label mb-8" style="text-align:left">Scores</div><div class="score-grid" id="reveal-scores"></div></div>
       <button class="btn btn-reveal mt-8" id="btn-next" style="max-width:320px">Next →</button>
+    </div>
+  </div>
+
+  <!-- QUESTION (Same Letter) -->
+  <div id="screen-question-sl" class="screen col center gap-0">
+    <div class="trv-game-inner">
+      <div class="trv-qmeta"><span class="cat" id="q-sl-cat"></span></div>
+      <div class="trv-timer" id="q-sl-timer">60</div>
+      <div class="sl-prompt">Starting with <span class="sl-letter" id="q-sl-letter">B</span></div>
+      <div class="trv-progress" id="q-sl-progress">Players are typing…</div>
+      <button class="btn btn-ghost" id="btn-reveal-sl" style="max-width:320px">Reveal answers →</button>
+    </div>
+  </div>
+
+  <!-- REVEAL (Same Letter) -->
+  <div id="screen-reveal-sl" class="screen col center gap-0">
+    <div class="trv-game-inner">
+      <div class="trv-reveal-sub" id="reveal-sl-sub"></div>
+      <div class="sl-groups" id="reveal-sl-groups"></div>
+      <div style="width:100%"><div class="section-label mb-8" style="text-align:left">Scores</div><div class="score-grid" id="reveal-sl-scores"></div></div>
+      <button class="btn btn-reveal mt-8" id="btn-next-sl" style="max-width:320px">Next →</button>
     </div>
   </div>
 

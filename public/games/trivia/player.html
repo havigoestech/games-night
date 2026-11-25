@@ -28,6 +28,18 @@
     .p-locked-banner { font-family:'Fredoka',sans-serif; font-weight:700; color:#34C759; }
     .p-result { font-family:'Fredoka',sans-serif; font-size:2rem; font-weight:700; }
     .p-result.win { color:#34C759; } .p-result.lose { color:#FF2D55; }
+
+    /* Same Letter */
+    .sl-big-letter { font-family:'Fredoka',sans-serif; font-size:4rem; font-weight:700; line-height:1; background:linear-gradient(135deg,#BF5AF2,#00C7BE); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+    .p-sl-timer { font-family:'Fredoka',sans-serif; font-size:1.6rem; font-weight:700; color:#34C759; }
+    .p-sl-timer.low { color:#FF2D55; }
+    .sl-input-row { display:flex; gap:8px; width:100%; max-width:420px; }
+    .sl-input-row input { flex:1; }
+    .sl-feedback { font-size:0.85rem; font-weight:700; min-height:1.2em; color:#FF9500; }
+    .sl-your-list { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:100%; max-width:420px; }
+    .sl-your-chip { padding:6px 12px; border-radius:10px; background:rgba(88,86,214,0.2); border:1px solid rgba(88,86,214,0.4); font-weight:700; font-size:0.9rem; }
+    .sl-your-chip.scored { background:rgba(52,199,89,0.2); border-color:#34C759; }
+    .sl-your-chip.cancelled { background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.12); color:var(--text-muted); text-decoration:line-through; }
   </style>
 </head>
 <body>
@@ -74,6 +86,28 @@
     <div class="p-result" id="p-result"></div>
     <div style="color:var(--text-muted)">Correct answer: <strong id="p-correct" style="color:#fff"></strong></div>
     <div class="score-grid" id="p-scores" style="max-width:420px"></div>
+  </div>
+
+  <!-- QUESTION (Same Letter) -->
+  <div id="screen-question-sl" class="screen col center gap-12">
+    <div class="p-qmeta" id="p-sl-meta"></div>
+    <div class="sl-big-letter" id="p-sl-letter">B</div>
+    <div class="p-question" id="p-sl-cat"></div>
+    <div class="p-sl-timer" id="p-sl-timer">60</div>
+    <div class="sl-input-row">
+      <input type="text" id="p-sl-input" placeholder="Type an answer…" autocomplete="off" autocapitalize="words" maxlength="40">
+      <button class="btn btn-primary" id="p-sl-add" style="width:auto;padding:12px 20px">Add</button>
+    </div>
+    <div class="sl-feedback" id="p-sl-feedback"></div>
+    <div class="sl-your-list" id="p-sl-list"></div>
+  </div>
+
+  <!-- REVEAL (Same Letter) -->
+  <div id="screen-reveal-sl" class="screen col center gap-12">
+    <div class="p-result" id="p-sl-result"></div>
+    <div style="color:var(--text-muted);font-size:0.85rem">Unique answers score · duplicates cancel</div>
+    <div class="sl-your-list" id="p-sl-mine"></div>
+    <div class="score-grid" id="p-sl-scores" style="max-width:420px"></div>
   </div>
 
   <!-- ROUND OVER -->

@@ -14,6 +14,7 @@ const playerId = (() => {
 let myTeamIndex = -1, myTeamColor = '#5856D6', teamNames = [], teamColors = [];
 let joinedRoomCode = null, pendingName = '', pendingRoom = '';
 let answered = false, myChoice = null, currentOptions = [];
+let slAnswers = [], slLetter = '';
 
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); const el = document.getElementById(id); if (el) el.classList.add('active'); }
@@ -92,18 +93,55 @@ function choose(i) {
   renderOptions(currentOptions, { locked: true, chosen: i });
   const lb = document.getElementById('p-locked'); lb.style.display = 'block'; lb.textContent = `Locked in: ${LETTERS[i]} — nice!`;
 }
-socket.on('you-submitted', () => {});
+socket.on('you-submitted', (ack) => {
+  if (!ack || !('accepted' in ack)) return;           // Fastest Finger ack — nothing to show
+  const fb = document.getElementById('p-sl-feedback');
+  if (ack.accepted) { slAnswers = ack.yourAnswers || slAnswers; fb.textContent = ''; renderSLList(); Sounds.pointAwarded(); }
+  else {
+    if (ack.reason === 'letter') fb.textContent = `Must start with ${ack.letter} 🙂`;
+    else if (ack.reason === 'dup') fb.textContent = 'You already got that one!';
+    else fb.textContent = 'Try again…';
+    Sounds.noPoint();
+  }
+});
 
-socket.on('question', (d) => {
+socket.on('question', (d) => { if (d.mode === 'same-letter') showSLQuestion(d); else showFFQuestion(d); });
+function showFFQuestion(d) {
   answered = false; myChoice = null;
   document.getElementById('p-qmeta').textContent = `${d.category || ''} · Q${d.qNumber} of ${d.qCount}`;
   document.getElementById('p-question').textContent = d.question;
   document.getElementById('p-locked').style.display = 'none';
   renderOptions(d.options, {});
   showScreen('screen-question');
-});
+}
+function showSLQuestion(d) {
+  slAnswers = []; slLetter = d.letter;
+  document.getElementById('p-sl-meta').textContent = `Prompt ${d.qNumber} of ${d.qCount}`;
+  document.getElementById('p-sl-letter').textContent = d.letter;
+  document.getElementById('p-sl-cat').textContent = `${d.category} starting with “${d.letter}”`;
+  document.getElementById('p-sl-timer').textContent = d.seconds != null ? d.seconds : '';
+  document.getElementById('p-sl-input').value = '';
+  document.getElementById('p-sl-feedback').textContent = '';
+  renderSLList();
+  showScreen('screen-question-sl');
+  setTimeout(() => { const el = document.getElementById('p-sl-input'); if (el) el.focus(); }, 60);
+}
+function renderSLList() {
+  const box = document.getElementById('p-sl-list'); box.innerHTML = '';
+  slAnswers.forEach(a => { const c = document.createElement('div'); c.className = 'sl-your-chip'; c.textContent = a; box.appendChild(c); });
+}
+function slSubmit() {
+  const inp = document.getElementById('p-sl-input'); const v = inp.value.trim();
+  if (!v) return;
+  socket.emit('submit', { answer: v });
+  inp.value = ''; inp.focus();
+}
+document.getElementById('p-sl-add').addEventListener('click', slSubmit);
+document.getElementById('p-sl-input').addEventListener('keydown', e => { if (e.key === 'Enter') slSubmit(); });
+socket.on('timer', ({ secondsLeft }) => { const t = document.getElementById('p-sl-timer'); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
 
-socket.on('question-reveal', (d) => {
+socket.on('question-reveal', (d) => { if (d.mode === 'same-letter') showSLReveal(d, slAnswers); else showFFReveal(d); });
+function showFFReveal(d) {
   const mine = (d.results || []).find(r => r.playerId === playerId);
   const res = document.getElementById('p-result');
   if (mine && mine.correct) { res.textContent = `Correct! +${mine.points}`; res.className = 'p-result win'; Sounds.pointAwarded(); }
@@ -112,7 +150,23 @@ socket.on('question-reveal', (d) => {
   document.getElementById('p-correct').textContent = d.correct;
   renderScoreCards('p-scores', d.scores);
   showScreen('screen-reveal');
-});
+}
+function showSLReveal(d, myAnswers) {
+  const mine = (d.results || []).find(r => r.playerId === playerId);
+  const pts = mine ? mine.points : 0;
+  const res = document.getElementById('p-sl-result');
+  res.textContent = pts > 0 ? `+${pts} points!` : 'No points this time';
+  res.className = 'p-result ' + (pts > 0 ? 'win' : 'lose');
+  pts > 0 ? Sounds.pointAwarded() : Sounds.noPoint();
+  const nrm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const scored = new Set(), cancelled = new Set();
+  (d.groups || []).forEach(g => (g.scored ? scored : cancelled).add(nrm(g.text)));
+  const box = document.getElementById('p-sl-mine'); box.innerHTML = '';
+  (myAnswers || []).forEach(a => { const c = document.createElement('div'); const n = nrm(a); c.className = 'sl-your-chip ' + (scored.has(n) ? 'scored' : (cancelled.has(n) ? 'cancelled' : '')); c.textContent = a; box.appendChild(c); });
+  if (!(myAnswers || []).length) box.innerHTML = '<div style="color:var(--text-muted)">No answers this round</div>';
+  renderScoreCards('p-sl-scores', d.scores);
+  showScreen('screen-reveal-sl');
+}
 
 socket.on('round-over', (d) => { Sounds.go(); renderLeaderboard('p-ro-leaderboard', d.scores); showScreen('screen-round-over'); });
 socket.on('game-over', ({ scores }) => { Sounds.gameOver(); clearSession(); renderLeaderboard('p-final-leaderboard', scores); showScreen('screen-game-over'); });
@@ -125,18 +179,27 @@ function applySnapshot(s) {
   if (s.teamColors) { teamColors = s.teamColors; myTeamColor = teamColors[myTeamIndex] || myTeamColor; }
   switch (s.phase) {
     case 'question': {
-      answered = !!(s.you && s.you.answered);
-      myChoice = s.you ? s.you.choice : null;
-      if (s.question) {
-        document.getElementById('p-qmeta').textContent = `${s.question.category || ''} · Q${s.qNumber} of ${s.qCount}`;
-        document.getElementById('p-question').textContent = s.question.question;
-        renderOptions(s.question.options, answered ? { locked: true, chosen: myChoice } : {});
-        const lb = document.getElementById('p-locked'); lb.style.display = answered ? 'block' : 'none'; if (answered) lb.textContent = `Locked in: ${LETTERS[myChoice]}`;
+      if (s.question && s.question.mode === 'same-letter') {
+        showSLQuestion({ ...s.question, qNumber: s.qNumber, qCount: s.qCount, seconds: s.secondsLeft });
+        slAnswers = (s.you && s.you.answers) || [];
+        renderSLList();
+      } else {
+        answered = !!(s.you && s.you.answered);
+        myChoice = s.you ? s.you.choice : null;
+        if (s.question) {
+          document.getElementById('p-qmeta').textContent = `${s.question.category || ''} · Q${s.qNumber} of ${s.qCount}`;
+          document.getElementById('p-question').textContent = s.question.question;
+          renderOptions(s.question.options, answered ? { locked: true, chosen: myChoice } : {});
+          const lb = document.getElementById('p-locked'); lb.style.display = answered ? 'block' : 'none'; if (answered) lb.textContent = `Locked in: ${LETTERS[myChoice]}`;
+        }
+        showScreen('screen-question');
       }
-      showScreen('screen-question'); break;
+      break;
     }
     case 'question-reveal': {
-      if (s.reveal) {
+      if (s.reveal && s.reveal.mode === 'same-letter') {
+        showSLReveal(s.reveal, (s.you && s.you.answers) || slAnswers);
+      } else if (s.reveal) {
         const mine = (s.reveal.results || []).find(r => r.playerId === playerId);
         const res = document.getElementById('p-result');
         if (mine && mine.correct) { res.textContent = `Correct! +${mine.points}`; res.className = 'p-result win'; }
@@ -144,8 +207,9 @@ function applySnapshot(s) {
         else { res.textContent = "Time's up ⏱"; res.className = 'p-result lose'; }
         document.getElementById('p-correct').textContent = s.reveal.correct;
         renderScoreCards('p-scores', s.reveal.scores || s.scores);
-      }
-      showScreen('screen-reveal'); break;
+        showScreen('screen-reveal');
+      } else { showScreen('screen-reveal'); }
+      break;
     }
     case 'round-over': renderLeaderboard('p-ro-leaderboard', s.scores); showScreen('screen-round-over'); break;
     case 'game-over': renderLeaderboard('p-final-leaderboard', s.scores); showScreen('screen-game-over'); break;

@@ -3,6 +3,7 @@ const socket = io('/trivia');
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 let teamMode = 'teams';
 let categories = [];
+let modes = [];
 let currentScores = [];
 let allPlayers = [];
 let playlist = [{ mode: 'fastest-finger', category: 'any', difficulty: 'any', count: 5, seconds: 20 }];
@@ -16,7 +17,7 @@ function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':
 function dbg(m) { const el = document.getElementById('debug-log'); if (el) el.textContent = m; }
 
 socket.on('connect', () => socket.emit('get-meta'));
-socket.on('trivia-meta', ({ categories: cats }) => { categories = cats || []; renderPlaylist(); });
+socket.on('trivia-meta', ({ categories: cats, modes: m }) => { categories = cats || []; modes = m || []; renderPlaylist(); });
 
 // ── Setup: teams/solo toggle ──
 document.querySelectorAll('#seg-mode button').forEach(b => b.addEventListener('click', () => {
@@ -45,29 +46,39 @@ document.getElementById('team-minus').addEventListener('click', () => { if (team
 document.getElementById('team-plus').addEventListener('click', () => { if (teamCount < 8) { teamCount++; document.getElementById('team-count').textContent = teamCount; renderTeamInputs(); } });
 
 // ── Playlist builder ──
+function secondsOptions(r, vals) { return vals.map(v => `<option value="${v}"${r.seconds == v ? ' selected' : ''}>${v}s</option>`).join(''); }
 function renderPlaylist() {
   const box = document.getElementById('playlist');
   box.innerHTML = '';
+  const modeOpts = r => modes.map(m => `<option value="${m.key}"${r.mode === m.key ? ' selected' : ''}>${m.icon} ${m.name}</option>`).join('');
   playlist.forEach((r, i) => {
     const card = document.createElement('div');
     card.className = 'trv-round-card';
-    const catOpts = ['<option value="any">Any category</option>'].concat(categories.map(c => `<option value="${escapeHtml(c)}"${r.category === c ? ' selected' : ''}>${escapeHtml(c)}</option>`)).join('');
-    card.innerHTML = `
-      <div class="trv-round-head"><span>⚡ Round ${i + 1} · Fastest Finger</span>${playlist.length > 1 ? `<button class="trv-round-del" data-i="${i}">✕</button>` : ''}</div>
-      <div class="trv-round-grid">
+    let fields;
+    if (r.mode === 'same-letter') {
+      fields = `
+        <div><label>Prompts</label><input type="number" data-f="count" data-i="${i}" min="1" max="12" value="${r.count}"></div>
+        <div><label>Seconds each</label><select data-f="seconds" data-i="${i}">${secondsOptions(r, [45, 60, 90, 120])}</select></div>
+        <div style="grid-column:1/-1;font-size:0.72rem;color:var(--text-muted)">Random category + letter each prompt. Type as many as you can — duplicates cancel.</div>`;
+    } else {
+      const catOpts = ['<option value="any">Any category</option>'].concat(categories.map(c => `<option value="${escapeHtml(c)}"${r.category === c ? ' selected' : ''}>${escapeHtml(c)}</option>`)).join('');
+      fields = `
         <div><label>Category</label><select data-f="category" data-i="${i}">${catOpts}</select></div>
         <div><label>Difficulty</label><select data-f="difficulty" data-i="${i}">
-          <option value="any"${r.difficulty==='any'?' selected':''}>Any</option>
-          <option value="easy"${r.difficulty==='easy'?' selected':''}>Easy</option>
-          <option value="medium"${r.difficulty==='medium'?' selected':''}>Medium</option>
-          <option value="hard"${r.difficulty==='hard'?' selected':''}>Hard</option></select></div>
+          <option value="any"${r.difficulty === 'any' ? ' selected' : ''}>Any</option>
+          <option value="easy"${r.difficulty === 'easy' ? ' selected' : ''}>Easy</option>
+          <option value="medium"${r.difficulty === 'medium' ? ' selected' : ''}>Medium</option>
+          <option value="hard"${r.difficulty === 'hard' ? ' selected' : ''}>Hard</option></select></div>
         <div><label>Questions</label><input type="number" data-f="count" data-i="${i}" min="1" max="20" value="${r.count}"></div>
-        <div><label>Seconds each</label><select data-f="seconds" data-i="${i}">
-          <option value="10"${r.seconds==10?' selected':''}>10s</option>
-          <option value="15"${r.seconds==15?' selected':''}>15s</option>
-          <option value="20"${r.seconds==20?' selected':''}>20s</option>
-          <option value="30"${r.seconds==30?' selected':''}>30s</option></select></div>
-      </div>`;
+        <div><label>Seconds each</label><select data-f="seconds" data-i="${i}">${secondsOptions(r, [10, 15, 20, 30])}</select></div>`;
+    }
+    card.innerHTML = `
+      <div class="trv-round-head">
+        <span>Round ${i + 1}</span>
+        <select data-f="mode" data-i="${i}" style="flex:1;margin:0 10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:9px;color:#fff;font-family:'Fredoka',sans-serif;font-weight:600;padding:6px 8px">${modeOpts(r)}</select>
+        ${playlist.length > 1 ? `<button class="trv-round-del" data-i="${i}">✕</button>` : ''}
+      </div>
+      <div class="trv-round-grid">${fields}</div>`;
     box.appendChild(card);
   });
   box.querySelectorAll('[data-f]').forEach(el => el.addEventListener('change', e => {
@@ -75,6 +86,13 @@ function renderPlaylist() {
     let v = e.target.value;
     if (f === 'count') v = Math.min(Math.max(parseInt(v) || 5, 1), 20);
     if (f === 'seconds') v = parseInt(v);
+    if (f === 'mode') {
+      playlist[i].mode = v;
+      const md = modes.find(m => m.key === v);
+      if (md) playlist[i].seconds = md.defaultSeconds;
+      renderPlaylist();
+      return;
+    }
     playlist[i][f] = v;
   }));
   box.querySelectorAll('.trv-round-del').forEach(b => b.addEventListener('click', e => { playlist.splice(+e.target.dataset.i, 1); renderPlaylist(); }));
@@ -152,26 +170,39 @@ function renderOptions(container, options, opts = {}) {
     container.appendChild(div);
   });
 }
-socket.on('question', (d) => {
+socket.on('question', (d) => { if (d.mode === 'same-letter') showSLQuestion(d); else showFFQuestion(d); });
+function showFFQuestion(d) {
   Sounds.wordReveal();
   document.getElementById('q-cat').textContent = d.category || '';
   document.getElementById('q-number').textContent = `Question ${d.qNumber} of ${d.qCount}`;
   document.getElementById('q-question').textContent = d.question;
   renderOptions(document.getElementById('q-options'), d.options);
   const timer = document.getElementById('q-timer'); timer.textContent = d.seconds; timer.classList.remove('low');
-  document.getElementById('q-progress').textContent = `0 / ${allPlayers.filter(p=>p.connected).length} answered`;
+  document.getElementById('q-progress').textContent = `0 / ${allPlayers.filter(p => p.connected).length} answered`;
   showScreen('screen-question');
-});
+}
+function showSLQuestion(d) {
+  Sounds.wordReveal();
+  document.getElementById('q-sl-cat').textContent = `${d.category} · Prompt ${d.qNumber} of ${d.qCount}`;
+  document.getElementById('q-sl-letter').textContent = d.letter;
+  const t = document.getElementById('q-sl-timer'); t.textContent = d.seconds; t.classList.remove('low');
+  document.getElementById('q-sl-progress').textContent = 'Players are typing…';
+  showScreen('screen-question-sl');
+}
 socket.on('timer', ({ secondsLeft }) => {
-  const t = document.getElementById('q-timer'); t.textContent = secondsLeft;
-  t.classList.toggle('low', secondsLeft <= 5);
+  ['q-timer', 'q-sl-timer'].forEach(id => { const t = document.getElementById(id); if (t) { t.textContent = secondsLeft; t.classList.toggle('low', secondsLeft <= 5); } });
   if (secondsLeft <= 5 && secondsLeft > 0) Sounds.tick();
 });
-socket.on('answer-progress', ({ answered, total }) => { document.getElementById('q-progress').textContent = `${answered} / ${total} answered`; });
+socket.on('answer-progress', ({ answered, total }) => {
+  const ff = document.getElementById('q-progress'); if (ff) ff.textContent = `${answered} / ${total} answered`;
+  const sl = document.getElementById('q-sl-progress'); if (sl) sl.textContent = `${answered} of ${total} players answering…`;
+});
 document.getElementById('btn-reveal').addEventListener('click', () => socket.emit('advance'));
+document.getElementById('btn-reveal-sl').addEventListener('click', () => socket.emit('advance'));
 
 // ── Reveal ──
-socket.on('question-reveal', (d) => {
+socket.on('question-reveal', (d) => { if (d.mode === 'same-letter') showSLReveal(d); else showFFReveal(d); });
+function showFFReveal(d) {
   Sounds.pointAwarded();
   const top = (d.results || []).find(r => r.correct);
   document.getElementById('reveal-sub').innerHTML = top ? `✅ <strong>${escapeHtml(d.correct)}</strong> — fastest: ${escapeHtml(top.name)}` : `✅ <strong>${escapeHtml(d.correct)}</strong>`;
@@ -180,8 +211,24 @@ socket.on('question-reveal', (d) => {
   currentScores = d.scores;
   renderScoreCards('reveal-scores', d.scores);
   showScreen('screen-reveal');
-});
+}
+function showSLReveal(d) {
+  Sounds.pointAwarded();
+  document.getElementById('reveal-sl-sub').innerHTML = `🔤 ${escapeHtml(d.category)} · starting with <span class="sl-letter">${escapeHtml(d.letter)}</span>`;
+  const box = document.getElementById('reveal-sl-groups'); box.innerHTML = '';
+  (d.groups || []).forEach(g => {
+    const chip = document.createElement('div');
+    chip.className = 'sl-chip ' + (g.scored ? 'scored' : 'cancelled');
+    chip.innerHTML = `<span class="txt">${escapeHtml(g.text)}</span>${g.count > 1 ? `<span class="who">×${g.count}</span>` : ''}`;
+    box.appendChild(chip);
+  });
+  if (!(d.groups || []).length) box.innerHTML = '<div style="color:var(--text-muted)">No answers this round!</div>';
+  currentScores = d.scores;
+  renderScoreCards('reveal-sl-scores', d.scores);
+  showScreen('screen-reveal-sl');
+}
 document.getElementById('btn-next').addEventListener('click', () => socket.emit('advance'));
+document.getElementById('btn-next-sl').addEventListener('click', () => socket.emit('advance'));
 
 // ── Round over ──
 socket.on('round-over', (d) => {

@@ -10,6 +10,7 @@ const ROOM_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 const MODES = {
   'fastest-finger': require('./modes/fastest-finger'),
+  'same-letter': require('./modes/same-letter'),
 };
 
 const rooms = new Map();
@@ -313,7 +314,7 @@ module.exports = function registerTrivia(namespace, localIP, port) {
       if (!player) return;
       const res = modeOf(room).submit(room, player, payload || {});
       if (res && res.ok) {
-        socket.emit('you-submitted', { choice: res.choice });
+        socket.emit('you-submitted', res.ack || { choice: res.choice });
         const answered = room.modeState && room.modeState.answers ? room.modeState.answers.size : 0;
         const total = room.players.filter(p => p.connected).length;
         if (room.hostSocketId) namespace.to(room.hostSocketId).emit('answer-progress', { answered, total });
