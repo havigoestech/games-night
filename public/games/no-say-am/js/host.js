@@ -139,6 +139,20 @@ socket.on('turn-progress', ({ got, skipped, scores, lastResult }) => {
 });
 document.getElementById('btn-end-turn').addEventListener('click', () => socket.emit('end-turn'));
 
+// ── End game — on every between-action host screen; two-tap safety so a stray
+//    tap never kills the game mid-night. ──
+document.querySelectorAll('.nsa-end-game').forEach(b => {
+  let armed = false, timer = null;
+  b.addEventListener('click', () => {
+    if (!armed) {
+      armed = true; b.textContent = 'Tap again to end'; b.style.color = '#FF6482'; b.style.borderColor = 'rgba(255,45,85,0.5)';
+      clearTimeout(timer); timer = setTimeout(() => { armed = false; b.textContent = '⏹ End game'; b.style.color = ''; b.style.borderColor = ''; }, 3000);
+      return;
+    }
+    socket.emit('end-game');
+  });
+});
+
 // ── Turn over (with strike) ──
 socket.on('turn-over', (d) => {
   if (currentScreen() !== 'screen-turn-over') Sounds.timeUp();

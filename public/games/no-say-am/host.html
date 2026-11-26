@@ -122,6 +122,7 @@
     <div class="nsa-describer"><span id="intro-describer"></span> will describe 🎤</div>
     <p class="nsa-hidden-note">Hand the phone to the describer. When they're ready, they (or you) start the clock.</p>
     <button class="btn btn-reveal btn-wide" id="btn-start-turn">Start Turn</button>
+    <button class="btn btn-ghost btn-wide nsa-end-game" style="margin-top:2px">⏹ End game</button>
   </div>
 
   <!-- IN TURN (TV) — timer + score, never the word -->
@@ -131,7 +132,10 @@
     <div class="nsa-turn-got">✅ Got: <span id="turn-got">0</span> &nbsp;·&nbsp; ⏭ Skipped: <span id="turn-skipped">0</span></div>
     <p class="nsa-hidden-note">🙊 The word is on <strong id="turn-describer"></strong>'s phone. Shout your guesses — don't say the forbidden words!</p>
     <div class="score-grid" id="turn-scores" style="margin-top:4px"></div>
-    <button class="btn btn-ghost btn-wide" id="btn-end-turn" style="margin-top:8px">End turn now</button>
+    <div class="row gap-10" style="margin-top:8px;flex-wrap:wrap;justify-content:center">
+      <button class="btn btn-ghost" id="btn-end-turn">End turn now</button>
+      <button class="btn btn-ghost nsa-end-game">⏹ End game</button>
+    </div>
   </div>
 
   <!-- TURN OVER — strike controls -->
@@ -141,6 +145,7 @@
     <p class="nsa-hidden-note">Tap a <span style="color:#34C759;font-weight:800">green</span> word to remove its point if a forbidden word slipped out.</p>
     <div class="nsa-words" id="over-words"></div>
     <button class="btn btn-reveal btn-wide" id="btn-next" style="margin-top:8px">Next</button>
+    <button class="btn btn-ghost btn-wide nsa-end-game" style="margin-top:2px">⏹ End game</button>
   </div>
 
   <!-- ROUND OVER -->
@@ -149,6 +154,7 @@
     <h2 class="heading" style="font-size:1.8rem">Scores so far</h2>
     <div class="leaderboard" id="ro-leaderboard" style="width:100%;max-width:520px"></div>
     <button class="btn btn-reveal btn-wide" id="btn-next-round">Next Round</button>
+    <button class="btn btn-ghost btn-wide nsa-end-game" style="margin-top:2px">⏹ End game</button>
   </div>
 
   <!-- GAME OVER -->
