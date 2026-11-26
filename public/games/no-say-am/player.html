@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>No Say Am</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/boot.js"></script>
+  <style>
+    .nsa-timer-badge { position:fixed; top:10px; right:12px; z-index:40; font-family:'Fredoka',sans-serif; font-weight:700; font-size:1.3rem; background:rgba(10,10,24,0.82); color:#34C759; border-radius:12px; padding:4px 12px; min-width:58px; text-align:center; }
+    .nsa-timer-badge.low { color:#FF2D55; }
+    .nsa-meta { font-size:0.8rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); }
+
+    /* Describer card */
+    .nsa-card { width:100%; max-width:440px; background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:22px 20px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+    .nsa-word-label { font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.14em; color:var(--text-muted); }
+    .nsa-word { font-family:'Fredoka',sans-serif; font-weight:700; font-size:clamp(2rem,9vw,3rem); line-height:1.05; text-align:center; }
+    .nsa-dont-say { width:100%; border-top:1px dashed rgba(255,255,255,0.15); padding-top:12px; }
+    .nsa-dont-label { font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.12em; color:#FF6482; margin-bottom:8px; text-align:center; }
+    .nsa-taboo-list { display:flex; flex-direction:column; gap:6px; }
+    .nsa-taboo { font-family:'Fredoka',sans-serif; font-weight:600; font-size:1.15rem; text-align:center; color:#FF8095; background:rgba(255,45,85,0.1); border:1px solid rgba(255,45,85,0.22); border-radius:10px; padding:6px 10px; }
+    .nsa-gotcount { font-size:0.95rem; font-weight:700; color:var(--text-muted); }
+    .nsa-actions { display:flex; gap:12px; width:100%; max-width:440px; }
+    .nsa-btn { flex:1; border:none; border-radius:16px; padding:20px 10px; font-family:'Fredoka',sans-serif; font-weight:700; font-size:1.3rem; cursor:pointer; color:#fff; display:flex; flex-direction:column; align-items:center; gap:2px; }
+    .nsa-btn small { font-weight:600; font-size:0.72rem; opacity:0.85; }
+    .nsa-got { background:#34C759; }
+    .nsa-skip { background:#FF9500; }
+    .nsa-btn:active { transform:scale(0.97); }
+
+    .nsa-big-emoji { font-size:3.4rem; }
+    .team-badge { display:inline-block; border-radius:999px; padding:6px 18px; font-family:'Fredoka',sans-serif; font-weight:700; font-size:1.1rem; }
+    .nsa-guess-hint { font-family:'Fredoka',sans-serif; font-weight:700; font-size:clamp(1.4rem,6vw,2rem); line-height:1.2; }
+  </style>
+</head>
+<body>
+
+  <div class="nsa-timer-badge" id="player-timer" style="display:none">0:00</div>
+
+  <!-- JOIN -->
+  <div id="screen-join" class="screen active col center gap-16">
+    <a href="/" class="back-link" style="position:absolute;top:16px;left:16px;color:rgba(255,255,255,0.4);font-weight:700;text-decoration:none">← Games Night</a>
+    <div class="nsa-big-emoji">🙊</div>
+    <h1 class="heading" style="font-size:2.2rem">No Say Am</h1>
+    <p style="color:var(--text-muted);font-size:0.95rem;max-width:300px">Describe the word without saying the five forbidden words.</p>
+    <div class="card col gap-12" style="max-width:360px">
+      <input type="text" id="input-name" placeholder="Your name" maxlength="20" autocomplete="off">
+      <input type="text" id="input-room" placeholder="Room code" maxlength="4" autocomplete="off" style="text-transform:uppercase;letter-spacing:0.2em;text-align:center;font-weight:700">
+      <button class="btn btn-green w-full" id="btn-join">Join Game</button>
+      <div class="error-msg" id="join-error"></div>
+    </div>
+  </div>
+
+  <!-- TEAM SELECT -->
+  <div id="screen-team-select" class="screen col center gap-16">
+    <h2 class="heading" style="font-size:1.6rem">Pick your team</h2>
+    <div id="team-buttons" class="col gap-10" style="width:100%;max-width:360px"></div>
+  </div>
+
+  <!-- WAITING (between turns) -->
+  <div id="screen-waiting" class="screen col center gap-16">
+    <div class="nsa-big-emoji">🙊</div>
+    <div class="nsa-guess-hint" id="waiting-title">Waiting to start…</div>
+    <div id="waiting-sub" style="color:var(--text-muted);font-weight:600"></div>
+    <div class="score-grid" id="waiting-scores" style="margin-top:8px"></div>
+  </div>
+
+  <!-- GET READY (you are the describer, turn-intro) -->
+  <div id="screen-get-ready" class="screen col center gap-16">
+    <div class="nsa-big-emoji">🎤</div>
+    <div class="nsa-meta">Round <span id="ready-round">1</span> · <span id="ready-team"></span></div>
+    <div class="nsa-guess-hint">You're describing!</div>
+    <p style="color:var(--text-muted);font-weight:600;max-width:320px">Get your team ready to guess. You'll see the word and five words you can't say. Tap <strong>Got it</strong> or <strong>Skip</strong> for each one.</p>
+    <button class="btn btn-green w-full" id="btn-start-turn" style="max-width:360px">Start — I'm ready</button>
+  </div>
+
+  <!-- DESCRIBE (you are the describer, in-turn) -->
+  <div id="screen-describe" class="screen col center gap-14" style="justify-content:flex-start;padding-top:52px">
+    <div class="nsa-meta"><span id="describe-team"></span> · Got <span id="describe-got">0</span></div>
+    <div class="nsa-card">
+      <div class="nsa-word-label">Describe this</div>
+      <div class="nsa-word" id="card-word">—</div>
+      <div class="nsa-dont-say">
+        <div class="nsa-dont-label">🚫 Don't say</div>
+        <div class="nsa-taboo-list" id="card-taboo"></div>
+      </div>
+    </div>
+    <div class="nsa-actions">
+      <button class="nsa-btn nsa-skip" id="btn-skip">Skip<small>no point</small></button>
+      <button class="nsa-btn nsa-got" id="btn-got">Got it ✓<small>+1 point</small></button>
+    </div>
+  </div>
+
+  <!-- GUESS / WATCH (everyone else, in-turn) -->
+  <div id="screen-guess" class="screen col center gap-16">
+    <div class="nsa-big-emoji" id="guess-emoji">🗣️</div>
+    <div class="nsa-guess-hint" id="guess-title">Shout your guesses!</div>
+    <div id="guess-sub" style="color:var(--text-muted);font-weight:600;max-width:320px"></div>
+    <div class="nsa-meta" style="margin-top:6px">Got so far: <span id="guess-got">0</span></div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-16">
+    <div class="nsa-big-emoji">🏆</div>
+    <h1 class="heading" style="font-size:2rem">Final Scores</h1>
+    <div class="leaderboard" id="player-final-leaderboard" style="width:100%;max-width:360px"></div>
+    <a href="/" class="btn btn-ghost" style="max-width:360px">← Back to Games Night</a>
+  </div>
+
+  <!-- HOST DISCONNECTED -->
+  <div id="screen-host-disconnected" class="screen col center gap-16">
+    <div class="nsa-big-emoji">🔌</div>
+    <h2 class="heading" style="font-size:1.6rem">Host left the game</h2>
+    <p style="color:var(--text-muted)">The host ended or lost connection.</p>
+    <a href="/" class="btn btn-ghost" style="max-width:360px">← Back to Games Night</a>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/no-say-am/js/sounds.js"></script>
+  <script src="/games/no-say-am/js/player.js"></script>
+</body>
+</html>

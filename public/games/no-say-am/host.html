@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>No Say Am — Host</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/boot.js"></script>
+  <style>
+    .back-link { display:inline-flex; align-items:center; gap:6px; color:rgba(255,255,255,0.4); font-size:0.85rem; font-weight:700; text-decoration:none; margin-bottom:6px; }
+    .section-label { font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-muted); margin-bottom:10px; }
+    .seg { display:flex; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:12px; padding:4px; gap:4px; }
+    .seg button { flex:1; padding:10px; border:none; background:transparent; color:rgba(255,255,255,0.6); font-family:'Fredoka',sans-serif; font-weight:600; font-size:0.95rem; border-radius:9px; cursor:pointer; }
+    .seg button.active { background:linear-gradient(135deg,#FF375F,#5856D6); color:#fff; }
+    .stepper { display:flex; align-items:center; gap:14px; justify-content:center; }
+    .stepper button { width:44px; height:44px; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff; font-size:1.4rem; font-family:'Fredoka',sans-serif; cursor:pointer; }
+    .stepper .val { font-family:'Fredoka',sans-serif; font-size:1.8rem; font-weight:700; min-width:40px; text-align:center; }
+    .team-input-row { display:flex; align-items:center; gap:10px; }
+    .team-dot { width:14px; height:14px; border-radius:50%; flex-shrink:0; }
+    .opt-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+    .opt-grid.rounds { grid-template-columns:repeat(5,1fr); }
+    .opt-chip { border:1px solid var(--border); background:rgba(255,255,255,0.05); border-radius:12px; padding:12px 6px; text-align:center; font-family:'Fredoka',sans-serif; font-weight:700; cursor:pointer; color:#fff; }
+    .opt-chip.active { background:rgba(255,55,95,0.2); border-color:#FF375F; }
+
+    /* Lobby */
+    .lobby-code-section { display:flex; align-items:center; gap:24px; flex-wrap:wrap; justify-content:center; margin-bottom:12px; }
+    #screen-lobby { justify-content:flex-start; padding-top:32px; }
+    .player-group { background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:12px; padding:10px 14px; text-align:left; }
+    .player-group-header { font-size:0.8rem; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px; }
+    .player-group-members { font-size:0.95rem; color:var(--text-muted); font-weight:600; }
+
+    /* Turn intro */
+    .nsa-turn-team { font-family:'Fredoka',sans-serif; font-weight:700; font-size:clamp(2rem,6vw,3.2rem); }
+    .nsa-describer { font-size:clamp(1.1rem,3vw,1.6rem); font-weight:700; }
+
+    /* In-turn (TV) — timer + score, NEVER the word */
+    .nsa-clock { font-family:'Fredoka',sans-serif; font-weight:700; font-size:clamp(4rem,16vw,9rem); line-height:1; color:#34C759; }
+    .nsa-clock.low { color:#FF2D55; }
+    .nsa-turn-got { font-family:'Fredoka',sans-serif; font-weight:700; font-size:clamp(1.4rem,4vw,2.2rem); }
+    .nsa-hidden-note { color:var(--text-muted); font-weight:600; font-size:0.95rem; max-width:420px; }
+
+    /* Turn over — strike chips */
+    .nsa-words { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; width:100%; max-width:760px; }
+    .nsa-chip { font-family:'Fredoka',sans-serif; font-weight:700; font-size:1.05rem; border-radius:12px; padding:10px 16px; border:1px solid transparent; display:flex; align-items:center; gap:8px; }
+    .nsa-chip.got { background:rgba(52,199,89,0.18); border-color:#34C759; color:#fff; cursor:pointer; }
+    .nsa-chip.got.struck { background:rgba(255,45,85,0.12); border-color:rgba(255,45,85,0.5); color:var(--text-muted); text-decoration:line-through; }
+    .nsa-chip.skipped { background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.12); color:var(--text-muted); }
+    .nsa-chip .mark { font-size:0.9rem; }
+
+    .btn-wide { max-width:420px; }
+  </style>
+</head>
+<body>
+
+  <!-- SETUP -->
+  <div id="screen-setup" class="screen active col center gap-20">
+    <div class="col center gap-8">
+      <a href="/" class="back-link">← Games Night</a>
+      <span style="font-size:3rem">🙊</span>
+      <h1 class="heading" style="font-size:2.2rem">No Say Am</h1>
+      <p style="color:var(--text-muted);font-size:0.95rem;max-width:460px">Describe the word without saying the five forbidden words. Your team guesses; the host keeps them honest.</p>
+    </div>
+    <div class="card setup-wide">
+      <div class="setup-main">
+        <div>
+          <div class="section-label">Play as</div>
+          <div class="seg" id="seg-mode">
+            <button data-mode="teams" class="active">Teams</button>
+            <button data-mode="individual">Solo (free-for-all)</button>
+          </div>
+        </div>
+        <div id="teams-setup">
+          <div class="section-label">How many teams?</div>
+          <div class="stepper">
+            <button id="team-minus">−</button>
+            <div class="val" id="team-count">2</div>
+            <button id="team-plus">+</button>
+          </div>
+          <div id="team-name-inputs" class="col gap-8" style="margin-top:12px"></div>
+        </div>
+        <div>
+          <div class="section-label">Turn timer</div>
+          <div class="opt-grid" id="timer-opts"></div>
+        </div>
+        <div>
+          <div class="section-label">Rounds (each team describes once per round)</div>
+          <div class="opt-grid rounds" id="rounds-opts"></div>
+        </div>
+      </div>
+      <div class="setup-foot">
+        <button class="btn btn-reveal w-full" id="btn-create">Create Room</button>
+        <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="screen-lobby" class="screen col center gap-16">
+    <div class="lobby-code-section">
+      <div style="text-align:center">
+        <div class="section-label">Room Code</div>
+        <div class="room-code" id="lobby-room-code">----</div>
+        <div id="lobby-join-url" style="font-size:0.8rem;color:var(--text-muted);margin-top:6px;word-break:break-all"></div>
+        <div id="lobby-player-address" style="font-size:0.85rem;color:#34C759;font-weight:700;margin-top:6px;background:rgba(52,199,89,0.12);border-radius:8px;padding:6px 12px"></div>
+      </div>
+      <div class="qr-wrap" id="lobby-qr" style="display:none"><img id="lobby-qr-img" width="160" height="160" alt="QR Code"></div>
+    </div>
+    <div style="width:100%;max-width:560px">
+      <div class="section-label mb-8">Players (<span id="player-count">0</span>)</div>
+      <div class="col gap-8" id="player-groups"></div>
+    </div>
+    <button class="btn btn-reveal btn-wide" id="btn-start-game">Start Game</button>
+    <button class="btn btn-ghost btn-wide" id="btn-end-game-lobby" style="display:none">Skip this game</button>
+  </div>
+
+  <!-- TURN INTRO -->
+  <div id="screen-turn-intro" class="screen col center gap-16">
+    <div class="section-label" id="intro-round">Round 1 of 3</div>
+    <div class="nsa-turn-team" id="intro-team">Team</div>
+    <div class="nsa-describer"><span id="intro-describer"></span> will describe 🎤</div>
+    <p class="nsa-hidden-note">Hand the phone to the describer. When they're ready, they (or you) start the clock.</p>
+    <button class="btn btn-reveal btn-wide" id="btn-start-turn">Start Turn</button>
+  </div>
+
+  <!-- IN TURN (TV) — timer + score, never the word -->
+  <div id="screen-in-turn" class="screen col center gap-12">
+    <div class="section-label" id="turn-team-label">Team</div>
+    <div class="nsa-clock" id="turn-clock">1:00</div>
+    <div class="nsa-turn-got">✅ Got: <span id="turn-got">0</span> &nbsp;·&nbsp; ⏭ Skipped: <span id="turn-skipped">0</span></div>
+    <p class="nsa-hidden-note">🙊 The word is on <strong id="turn-describer"></strong>'s phone. Shout your guesses — don't say the forbidden words!</p>
+    <div class="score-grid" id="turn-scores" style="margin-top:4px"></div>
+    <button class="btn btn-ghost btn-wide" id="btn-end-turn" style="margin-top:8px">End turn now</button>
+  </div>
+
+  <!-- TURN OVER — strike controls -->
+  <div id="screen-turn-over" class="screen col center gap-14" style="justify-content:flex-start;padding-top:40px">
+    <div class="section-label" id="over-title">Turn over</div>
+    <div class="nsa-turn-got" id="over-summary"></div>
+    <p class="nsa-hidden-note">Tap a <span style="color:#34C759;font-weight:800">green</span> word to remove its point if a forbidden word slipped out.</p>
+    <div class="nsa-words" id="over-words"></div>
+    <button class="btn btn-reveal btn-wide" id="btn-next" style="margin-top:8px">Next</button>
+  </div>
+
+  <!-- ROUND OVER -->
+  <div id="screen-round-over" class="screen col center gap-16">
+    <div class="section-label" id="ro-title">Round complete</div>
+    <h2 class="heading" style="font-size:1.8rem">Scores so far</h2>
+    <div class="leaderboard" id="ro-leaderboard" style="width:100%;max-width:520px"></div>
+    <button class="btn btn-reveal btn-wide" id="btn-next-round">Next Round</button>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-game-over" class="screen col center gap-16">
+    <div style="font-size:3rem">🏆</div>
+    <h1 class="heading" style="font-size:2.2rem">Final Scores</h1>
+    <div class="leaderboard" id="final-leaderboard" style="width:100%;max-width:520px"></div>
+    <div class="row gap-10" style="flex-wrap:wrap;justify-content:center">
+      <button class="btn btn-reveal" id="btn-play-again">Play Again</button>
+      <a href="/" class="btn btn-ghost">← Games Night</a>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/games/no-say-am/js/sounds.js"></script>
+  <script src="/games/no-say-am/js/host.js"></script>
+</body>
+</html>

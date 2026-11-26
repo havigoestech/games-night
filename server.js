@@ -34,6 +34,7 @@ require('./games/family-feud/game.js')(io.of('/family-feud'), LOCAL_IP, PORT);
 require('./games/text-twist/game.js')(io.of('/text-twist'), LOCAL_IP, PORT);
 require('./games/kill-and-injury/game.js')(io.of('/kill-and-injury'), LOCAL_IP, PORT);
 require('./games/trivia/game.js')(io.of('/trivia'), LOCAL_IP, PORT);
+require('./games/no-say-am/game.js')(io.of('/no-say-am'), LOCAL_IP, PORT);
 require('./games/tournament/game.js')(io.of('/tournament'), LOCAL_IP, PORT);
 
 server.listen(PORT, () => {

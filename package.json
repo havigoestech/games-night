@@ -22,7 +22,9 @@
     "test:tourney-gtm": "node test/tournament-gtm.test.js",
     "test:tourney-trivia": "node test/tournament-trivia.test.js",
     "test:tourney-trivia-config": "node test/tournament-trivia-config.test.js",
-    "test:tourney-squad": "node test/tournament-squad.test.js"
+    "test:tourney-squad": "node test/tournament-squad.test.js",
+    "test:nsa": "node test/no-say-am.test.js",
+    "test:nsa-data": "node test/no-say-am-data.test.js"
   },
   "dependencies": {
     "express": "^4.18.2",
