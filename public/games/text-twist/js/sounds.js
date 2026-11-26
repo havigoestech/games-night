@@ -89,14 +89,22 @@ const Sounds = {
     [523, 659, 784, 1047].forEach((f, i) => tone(f, 'sine', 0.5, t + i * 0.11, 0.35));
   },
 
-  // Extra-special fanfare for the TOP word (the one that uses EVERY letter) —
-  // clearly bigger and higher than the normal point chime, with a sparkle on top.
+  // Triumphant TRUMPET fanfare for the TOP word (uses every letter). A brassy
+  // sawtooth tone (detuned + an octave of body) playing an ascending major
+  // arpeggio into a held high note with a shimmer — a proper celebration.
   topWord() {
     const c = ctx(); if (!c) return;
     const t = c.currentTime;
-    [659, 880, 1109, 1319, 1760].forEach((f, i) => tone(f, 'triangle', 0.5, t + i * 0.08, 0.32));
-    tone(2093, 'sine', 0.32, t + 0.42, 0.5);
-    tone(2637, 'sine', 0.22, t + 0.50, 0.45);
+    const brass = (freq, t0, dur, vol) => {
+      tone(freq, 'sawtooth', vol, t0, dur);
+      tone(freq * 1.004, 'sawtooth', vol * 0.6, t0, dur);   // slight detune → fuller brass
+      tone(freq / 2, 'square', vol * 0.28, t0, dur);        // body an octave down
+    };
+    brass(523.25, t,        0.13, 0.32);   // C5
+    brass(659.25, t + 0.13, 0.13, 0.32);   // E5
+    brass(783.99, t + 0.26, 0.13, 0.32);   // G5
+    brass(1046.5, t + 0.42, 0.55, 0.40);   // C6 — held, triumphant
+    tone(1567.98, 'sine', 0.18, t + 0.50, 0.45);   // G6 shimmer on top
   },
 
   // Descending wah-wah for no point

@@ -42,7 +42,9 @@
 
     .games-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      /* min(100%, …) stops a card ever overflowing; the rem part grows with the
+         text size, so columns drop to a single stack as you enlarge the text */
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
       gap: 20px;
       max-width: 960px;
       margin: 0 auto;
@@ -50,6 +52,9 @@
     /* Fill-the-screen mode (display control in boot.js) — use the full width. */
     html[data-gn-fill="1"] .games-grid { max-width: min(100%, 1600px); }
     html[data-gn-fill="1"] body { padding-left: 4vw; padding-right: 4vw; }
+    /* Text-weight control (boot.js) — thin out the bold display font when asked */
+    html[data-gn-weight="light"]  .header h1, html[data-gn-weight="light"]  .card-title { font-weight: 500 !important; }
+    html[data-gn-weight="medium"] .header h1, html[data-gn-weight="medium"] .card-title { font-weight: 600 !important; }
 
     .game-card {
       background: rgba(255,255,255,0.05);

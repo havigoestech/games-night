@@ -265,6 +265,13 @@ html[data-gn-fill="1"] .trv-game-inner { max-width: min(100%, 1500px); }
    normal / scannable. */
 html[data-gn-light="1"] img { filter: invert(1) hue-rotate(180deg); }
 
+/* ── Text weight (display control) ──
+   The bold Fredoka display font reads heavy at large sizes; let it be thinned. */
+html[data-gn-weight="light"]  h1, html[data-gn-weight="light"]  h2, html[data-gn-weight="light"]  h3, html[data-gn-weight="light"]  .heading,
+html[data-gn-weight="light"]  .room-code, html[data-gn-weight="light"]  .word-display, html[data-gn-weight="light"]  .landing-logo, html[data-gn-weight="light"]  .countdown-num { font-weight: 500 !important; }
+html[data-gn-weight="medium"] h1, html[data-gn-weight="medium"] h2, html[data-gn-weight="medium"] h3, html[data-gn-weight="medium"] .heading,
+html[data-gn-weight="medium"] .room-code, html[data-gn-weight="medium"] .word-display, html[data-gn-weight="medium"] .landing-logo, html[data-gn-weight="medium"] .countdown-num { font-weight: 600 !important; }
+
 /* Attaching to an existing room (see /js/boot.js) — hold the screens back so the
    default one can't paint before the server tells us which is right. Silent for
    the first 450ms so a fast attach shows nothing at all; only a genuinely slow

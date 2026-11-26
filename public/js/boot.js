@@ -1,14 +1,16 @@
-// ── Display controls (readability + light/dark) ────────────────
+// ── Display controls (readability + light/dark + themes) ───────
 // The app is dark-first and its vivid palette blooms on a mini-LED TV, and the
-// UI can be small / narrow on a big screen. These controls — a light/dark
-// toggle, manual saturation + brightness (calm the glare yourself), a text-size
-// scale (bigger TEXT, not a geometric zoom: it scales rem-based type so the
-// layout reflows instead of just magnifying) and a "fill the screen" toggle (use
-// the full width instead of a centred column) — are saved per device and applied
-// to <html> before paint. Light mode is a root invert+hue-rotate so it works
-// across every game without per-screen surgery; <img> (QR codes) are flipped
-// back in style.css. The floating control shows on host / TV / hub pages, not on
-// player phones (where "tap anywhere to buzz" could hit it).
+// UI can be small / narrow / heavy on a big screen. These controls — a
+// light/dark toggle with five accessible LIGHT colour themes, manual saturation
+// + brightness, a text-size scale (bigger TEXT, not a geometric zoom — scales
+// rem type so the layout reflows), a text-weight control (the bold display font
+// reads heavy when big), a "fill the screen" toggle and a Full-screen button —
+// are saved per device and applied to <html> before paint. Light mode is a root
+// invert + hue-rotate (works across every game, preserves the dark theme's
+// contrast ratios); the themes are warmth/hue variations layered on it, with a
+// cream (easiest on tired eyes) and a high-contrast mono as the accessibility
+// standouts. <img> (QR codes) are flipped back in style.css. The control shows
+// on host / TV / hub pages, not player phones (a buzz tap could hit it).
 (function () {
   var ls = {
     get: function (k, d) { try { var v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } },
@@ -16,16 +18,29 @@
   };
   var num = function (k, d) { var n = parseFloat(ls.get(k, String(d))); return isNaN(n) ? d : n; };
   var TEXT = [100, 115, 130, 150, 170, 190];
+  var WEIGHTS = [['light', 'Light'], ['medium', 'Medium'], ['bold', 'Bold']];
+  // Light-mode colour themes (layered on the root invert). sw = approx swatch.
+  var LIGHT_THEMES = [
+    { name: 'Paper', hue: 0,   extra: '',                              sw: '#edeff3' },
+    { name: 'Cream', hue: 12,  extra: 'sepia(0.35) ',                  sw: '#f2e7d2' },
+    { name: 'Slate', hue: 38,  extra: '',                              sw: '#d8e2ef' },
+    { name: 'Ocean', hue: -26, extra: '',                              sw: '#d4ece7' },
+    { name: 'Mono',  hue: 0,   extra: 'saturate(0.12) contrast(1.07) ', sw: '#e7e7e7' }
+  ];
 
   function apply() {
     var html = document.documentElement;
     var light = ls.get('gn-light', '0') === '1';
     var sat = num('gn-sat', 70), bright = num('gn-bright', 92), text = num('gn-text', 100);
     var fill = ls.get('gn-fill', '1') === '1';
-    html.style.filter = (light ? 'invert(1) hue-rotate(180deg) ' : '') + 'saturate(' + (sat / 100) + ') brightness(' + (bright / 100) + ')';
-    html.style.fontSize = (16 * text / 100).toFixed(2) + 'px';   // scales all rem-based text
+    var weight = ls.get('gn-weight', 'bold');
+    var lt = LIGHT_THEMES[parseInt(ls.get('gn-lt', '0'), 10)] || LIGHT_THEMES[0];
+    html.style.filter = (light ? 'invert(1) hue-rotate(' + (180 + lt.hue) + 'deg) ' + lt.extra : '') +
+                        'saturate(' + (sat / 100) + ') brightness(' + (bright / 100) + ')';
+    html.style.fontSize = (16 * text / 100).toFixed(2) + 'px';   // scales rem-based text
     html.setAttribute('data-gn-fill', fill ? '1' : '0');
     html.setAttribute('data-gn-light', light ? '1' : '0');
+    html.setAttribute('data-gn-weight', weight);
   }
   apply();   // runs in <head>, before the body paints
 
@@ -40,14 +55,17 @@
     wrap.style.cssText = 'position:fixed;top:8px;right:8px;z-index:3000;font-family:Nunito,system-ui,sans-serif';
     wrap.innerHTML =
       '<button type="button" id="gn-ctl-btn" aria-label="Display settings" style="width:40px;height:40px;border:none;border-radius:11px;background:rgba(20,20,34,0.72);color:#fff;font-size:19px;line-height:1;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.4)">🎨</button>' +
-      '<div id="gn-ctl-panel" style="display:none;margin-top:6px;width:236px;background:rgba(14,14,24,0.98);border:1px solid rgba(255,255,255,0.14);border-radius:14px;padding:13px;box-shadow:0 14px 34px rgba(0,0,0,0.55)">' +
+      '<div id="gn-ctl-panel" style="display:none;margin-top:6px;width:238px;max-height:calc(100vh - 66px);overflow-y:auto;background:rgba(14,14,24,0.98);border:1px solid rgba(255,255,255,0.14);border-radius:14px;padding:13px;box-shadow:0 14px 34px rgba(0,0,0,0.55)">' +
         '<div style="' + lbl + ';margin-bottom:7px">Appearance</div>' +
-        '<div style="display:flex;gap:6px;margin-bottom:12px"><button type="button" id="gn-dark" style="' + modeBtn + '">🌙 Dark</button><button type="button" id="gn-light-btn" style="' + modeBtn + '">☀️ Light</button></div>' +
+        '<div style="display:flex;gap:6px;margin-bottom:10px"><button type="button" id="gn-dark" style="' + modeBtn + '">🌙 Dark</button><button type="button" id="gn-light-btn" style="' + modeBtn + '">☀️ Light</button></div>' +
+        '<div id="gn-lt-row" style="display:none;gap:7px;margin-bottom:12px"></div>' +
         '<div style="' + lbl + '">Colour <span id="gn-sat-v" style="float:right;color:rgba(255,255,255,0.8)"></span></div>' +
         '<input type="range" id="gn-sat" min="0" max="100" style="' + rng + '">' +
         '<div style="' + lbl + '">Brightness <span id="gn-bright-v" style="float:right;color:rgba(255,255,255,0.8)"></span></div>' +
         '<input type="range" id="gn-bright" min="55" max="105" style="' + rng + '">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px"><span style="' + lbl + '">Text size</span><span style="display:flex;gap:6px"><button type="button" id="gn-td" style="' + sBtn + '">A−</button><span id="gn-text-v" style="min-width:44px;text-align:center;align-self:center;font-weight:800;font-size:0.82rem;color:#fff"></span><button type="button" id="gn-tu" style="' + sBtn + '">A+</button></span></div>' +
+        '<div style="' + lbl + ';margin-bottom:5px">Text weight</div>' +
+        '<div id="gn-weight-row" style="display:flex;gap:6px;margin-bottom:12px"></div>' +
         '<label style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;font-size:0.9rem;font-weight:700;color:#fff"><span>Fill the screen</span><input type="checkbox" id="gn-fill" style="width:20px;height:20px;accent-color:#34C759;cursor:pointer"></label>' +
         '<button type="button" id="gn-fs" style="width:100%;margin-top:12px;padding:9px;border:none;border-radius:9px;background:rgba(255,255,255,0.1);color:#fff;font-weight:700;font-size:0.9rem;cursor:pointer">⛶ Full screen</button>' +
       '</div>';
@@ -65,13 +83,36 @@
       var on = function (el, is) { el.style.borderColor = is ? '#5AC8FA' : 'rgba(255,255,255,0.14)'; el.style.background = is ? 'rgba(90,200,250,0.18)' : 'rgba(255,255,255,0.05)'; };
       on(document.getElementById('gn-light-btn'), light);
       on(document.getElementById('gn-dark'), !light);
+      document.getElementById('gn-lt-row').style.display = light ? 'flex' : 'none';   // themes are a light-mode thing
+    }
+    function renderThemes() {
+      var row = document.getElementById('gn-lt-row'); row.innerHTML = ''; row.style.flexWrap = 'wrap';
+      var cur = parseInt(ls.get('gn-lt', '0'), 10);
+      LIGHT_THEMES.forEach(function (th, i) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = th.name;
+        var o = i === cur;
+        b.style.cssText = 'flex:1 0 28%;padding:6px 4px;border-radius:7px;cursor:pointer;color:#fff;font-size:0.72rem;font-weight:700;white-space:nowrap;border:1.5px solid ' + (o ? '#5AC8FA' : 'rgba(255,255,255,0.14)') + ';background:' + (o ? 'rgba(90,200,250,0.18)' : 'rgba(255,255,255,0.05)');
+        b.addEventListener('click', function () { ls.set('gn-lt', String(i)); apply(); renderThemes(); });
+        row.appendChild(b);
+      });
+    }
+    function renderWeight() {
+      var row = document.getElementById('gn-weight-row'); row.innerHTML = '';
+      var cur = ls.get('gn-weight', 'bold');
+      WEIGHTS.forEach(function (w) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = w[1];
+        var o = cur === w[0];
+        b.style.cssText = 'flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid ' + (o ? '#5AC8FA' : 'rgba(255,255,255,0.14)') + ';background:' + (o ? 'rgba(90,200,250,0.18)' : 'rgba(255,255,255,0.05)') + ';color:#fff;font-size:0.8rem;cursor:pointer;font-weight:' + (w[0] === 'light' ? '400' : w[0] === 'medium' ? '600' : '800');
+        b.addEventListener('click', function () { ls.set('gn-weight', w[0]); apply(); renderWeight(); });
+        row.appendChild(b);
+      });
     }
     function sync() {
       sat.value = num('gn-sat', 70); document.getElementById('gn-sat-v').textContent = sat.value + '%';
       bright.value = num('gn-bright', 92); document.getElementById('gn-bright-v').textContent = bright.value + '%';
       document.getElementById('gn-text-v').textContent = num('gn-text', 100) + '%';
       document.getElementById('gn-fill').checked = ls.get('gn-fill', '1') === '1';
-      paintMode();
+      paintMode(); renderThemes(); renderWeight();
     }
     document.getElementById('gn-dark').addEventListener('click', function () { ls.set('gn-light', '0'); apply(); paintMode(); });
     document.getElementById('gn-light-btn').addEventListener('click', function () { ls.set('gn-light', '1'); apply(); paintMode(); });
