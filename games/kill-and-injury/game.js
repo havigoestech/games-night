@@ -148,6 +148,7 @@ module.exports = function registerKillAndInjury(namespace, localIP, port) {
 
     clearTimers(room);
     room.roundTimer = setInterval(() => {
+      if (room.paused) return;             // frozen while paused
       secondsLeft--;
       room.secondsLeft = secondsLeft;      // mirrored so a reconnect gets a LIVE clock
       if (secondsLeft > 0) {
@@ -277,6 +278,8 @@ module.exports = function registerKillAndInjury(namespace, localIP, port) {
     });
     [0, 1].forEach(i => toTeam(room, i, 'notes-update', { notes: room.notes[i] }));
   }
+
+  require('../shared/pause.js')(namespace, rooms);   // ⏸ pause / resume
 
   namespace.on('connection', (socket) => {
 

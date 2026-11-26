@@ -1,4 +1,5 @@
 const socket = io('/kill-and-injury');
+if (window.GNPause) GNPause.init(socket);
 
 // Shared games-night device id (same localStorage key as the other games) —
 // survives screen locks, refreshes and QR re-scans, so the server re-binds us

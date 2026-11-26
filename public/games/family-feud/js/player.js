@@ -1,4 +1,5 @@
 const socket = io('/family-feud');
+if (window.GNPause) GNPause.init(socket);
 
 // Shared games-night device id (same localStorage key as grab-the-mic) —
 // survives screen locks, refreshes, and QR re-scans so the server can

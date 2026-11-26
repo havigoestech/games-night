@@ -119,6 +119,7 @@ module.exports = function registerTrivia(namespace, localIP, port) {
   function startStageTimer(room) {
     clearRoomTimer(room);
     room.questionTimer = setInterval(() => {
+      if (room.paused) return;             // frozen while paused
       room.secondsLeft--;
       if (room.secondsLeft > 0) { namespace.to(room.roomCode).emit('timer', { secondsLeft: room.secondsLeft }); }
       else { namespace.to(room.roomCode).emit('timer', { secondsLeft: 0 }); resolveStage(room); }
@@ -239,6 +240,8 @@ module.exports = function registerTrivia(namespace, localIP, port) {
     if (room.roundIndex + 1 < room.playlist.length) { room.roundIndex++; room.qIndexInRound = -1; emitRoundIntro(room); }
     else { endGame(room); }
   }
+
+  require('../shared/pause.js')(namespace, rooms);   // ⏸ pause / resume
 
   namespace.on('connection', (socket) => {
 

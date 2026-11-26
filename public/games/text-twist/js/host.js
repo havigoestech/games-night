@@ -1,4 +1,5 @@
 const socket = io('/text-twist');
+if (window.GNPause) GNPause.init(socket);
 
 const TEAM_COLORS = ['#FF2D55','#5856D6','#FF9500','#34C759','#00C7BE','#FF375F','#BF5AF2','#FFD60A'];
 

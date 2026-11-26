@@ -4,6 +4,7 @@
 // It is never a player (can't buzz, not in the roster) and never receives the
 // answer key — the server unicasts that to the host alone.
 const socket = io('/family-feud');
+if (window.GNPause) GNPause.init(socket);
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

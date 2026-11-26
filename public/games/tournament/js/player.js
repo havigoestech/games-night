@@ -1,4 +1,5 @@
 const socket = io('/tournament');
+if (window.GNPause) GNPause.init(socket);
 
 // Shared games-night device id — the same key every game uses, so a player is
 // one identity across the tournament and every game it launches.

@@ -1,4 +1,5 @@
 const socket = io('/trivia');
+if (window.GNPause) GNPause.init(socket);
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 // Shared games-night device id (same key as the other games) so a screen-lock

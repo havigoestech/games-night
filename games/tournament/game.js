@@ -251,6 +251,8 @@ module.exports = function registerTournament(namespace, localIP, port) {
     });
   }
 
+  require('../shared/pause.js')(namespace, rooms);   // ⏸ pause / resume (no gameplay timer; the live sub-game handles its own)
+
   namespace.on('connection', (socket) => {
 
     // Give the builder what it needs to configure trivia rounds.

@@ -1,4 +1,5 @@
 const socket = io('/no-say-am');
+if (window.GNPause) GNPause.init(socket);
 
 // Persistent identity — survives screen locks / refreshes / QR re-scans.
 const playerId = (() => {

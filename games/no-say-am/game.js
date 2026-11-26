@@ -107,6 +107,8 @@ function snapshot(room, playerId) {
 
 module.exports = function registerNoSayAm(namespace, localIP, port) {
 
+  require('../shared/pause.js')(namespace, rooms);   // ⏸ pause / resume
+
   function emitPlayers(room) {
     if (!room.hostSocketId) return;
     namespace.to(room.hostSocketId).emit('players-update', { allPlayers: publicPlayers(room), scores: getScores(room) });
@@ -176,6 +178,7 @@ module.exports = function registerNoSayAm(namespace, localIP, port) {
     if (dSock) namespace.to(dSock).emit('card', { word: room.currentCard.word, taboo: room.currentCard.taboo, serial: room.cardSerial, cardNumber: 1 });
 
     room.turnTimer = setInterval(() => {
+      if (room.paused) return;             // frozen while paused
       room.secondsLeft--;
       if (room.secondsLeft > 0) {
         namespace.to(room.roomCode).emit('timer', { secondsLeft: room.secondsLeft });

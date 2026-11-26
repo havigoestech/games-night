@@ -216,6 +216,7 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
     room.timerKind = kind;
     emitTimer(room, seconds, kind, seconds);
     room.feudTimer = setInterval(() => {
+      if (room.paused) return;             // frozen while paused
       room.secondsLeft--;
       emitTimer(room, room.secondsLeft, kind, seconds);
       if (room.secondsLeft <= 0) {
@@ -310,6 +311,8 @@ module.exports = function registerFamilyFeud(namespace, localIP, port) {
       default: return;
     }
   }
+
+  require('../shared/pause.js')(namespace, rooms);   // ⏸ pause / resume
 
   namespace.on('connection', (socket) => {
 

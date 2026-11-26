@@ -167,6 +167,8 @@ module.exports = function registerGrabTheMic(namespace, localIP, port) {
     }
   }
 
+  require('../shared/pause.js')(namespace, rooms);   // ⏸ pause / resume
+
   namespace.on('connection', (socket) => {
 
     socket.on('create-room', ({ teamCount, teamNames, baseUrl, singingTime, buzzCountdown, scoreGoal, mode }) => {
@@ -352,6 +354,7 @@ module.exports = function registerGrabTheMic(namespace, localIP, port) {
       namespace.to(roomCode).emit('countdown', { seconds });
 
       room.countdownTimer = setInterval(() => {
+        if (room.paused) return;           // frozen while paused
         seconds--;
         room.countdownSecondsLeft = seconds;
         if (seconds > 0) {
@@ -401,6 +404,7 @@ module.exports = function registerGrabTheMic(namespace, localIP, port) {
       namespace.to(roomCode).emit('singing-timer', { secondsLeft });
 
       room.singingTimer = setInterval(() => {
+        if (room.paused) return;           // frozen while paused
         secondsLeft--;
         room.singingSecondsLeft = secondsLeft;
         if (secondsLeft > 0) {

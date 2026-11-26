@@ -1,4 +1,5 @@
 const socket = io('/no-say-am');
+if (window.GNPause) GNPause.init(socket);
 
 // Launched as part of a tournament? Adopt the pre-created room and return when done.
 const TOURNEY = (() => {

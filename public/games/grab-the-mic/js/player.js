@@ -1,4 +1,5 @@
 const socket = io('/grab-the-mic');
+if (window.GNPause) GNPause.init(socket);
 
 // Persistent identity — survives screen locks, refreshes, and re-scans of the
 // QR code, so the server can re-bind us to our existing player slot.

@@ -202,6 +202,8 @@ module.exports = function registerTextTwist(namespace, localIP, port) {
     }
   }
 
+  require('../shared/pause.js')(namespace, rooms);   // ⏸ pause / resume
+
   namespace.on('connection', (socket) => {
 
     socket.on('create-room', ({ teamCount, teamNames, mode, difficulty, roundSeconds, baseUrl }) => {
@@ -404,6 +406,7 @@ module.exports = function registerTextTwist(namespace, localIP, port) {
       });
 
       room.roundTimer = setInterval(() => {
+        if (room.paused) return;           // frozen while paused
         secondsLeft--;
         room.secondsLeft = secondsLeft;   // mirrored so a reconnect gets a live timer
         if (secondsLeft > 0) {
