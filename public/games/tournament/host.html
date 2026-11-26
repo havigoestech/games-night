@@ -96,46 +96,49 @@
       <h1 class="heading" style="font-size:2rem">Tournament</h1>
       <p style="color:var(--text-muted);font-size:0.9rem">Line up the games. One champion at the end.</p>
     </div>
-    <div class="card col gap-16">
-      <div>
-        <div class="section-label">Play As</div>
-        <div class="opt-row" id="mode-selector">
-          <button class="opt-btn active" data-mode="teams">Teams</button>
-          <button class="opt-btn" data-mode="individual">Individuals</button>
-        </div>
-      </div>
-
-      <div id="teams-setup" class="col gap-12">
+    <div class="card setup-wide">
+      <div class="setup-main">
         <div>
-          <div class="section-label">Number of Teams</div>
-          <div class="team-count-row">
-            <button class="count-btn" id="count-down">−</button>
-            <div class="count-num" id="team-count-display">2</div>
-            <button class="count-btn" id="count-up">+</button>
+          <div class="section-label">Play As</div>
+          <div class="opt-row" id="mode-selector">
+            <button class="opt-btn active" data-mode="teams">Teams</button>
+            <button class="opt-btn" data-mode="individual">Individuals</button>
           </div>
         </div>
-        <div>
-          <div class="section-label">Team Names</div>
-          <div id="team-name-inputs" class="col gap-8"></div>
+
+        <div id="teams-setup" class="col gap-12">
+          <div>
+            <div class="section-label">Number of Teams</div>
+            <div class="team-count-row">
+              <button class="count-btn" id="count-down">−</button>
+              <div class="count-num" id="team-count-display">2</div>
+              <button class="count-btn" id="count-up">+</button>
+            </div>
+          </div>
+          <div>
+            <div class="section-label">Team Names</div>
+            <div id="team-name-inputs" class="col gap-8"></div>
+          </div>
         </div>
       </div>
 
-      <div>
+      <div class="setup-aside">
         <div class="section-label">The Line-up</div>
         <div id="lineup"></div>
         <div class="game-pick" id="game-pick" style="margin-top:10px"></div>
       </div>
 
-      <div>
-        <div class="section-label">Points Per Finish</div>
-        <div class="place-row" id="placement"></div>
-        <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);font-weight:600;text-align:center;margin-top:6px">
-          Awarded after each game by finishing position. Lower places get 1 point.
+      <div class="setup-foot">
+        <div>
+          <div class="section-label">Points Per Finish</div>
+          <div class="place-row" id="placement"></div>
+          <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);font-weight:600;text-align:center;margin-top:6px">
+            Awarded after each game by finishing position. Lower places get 1 point.
+          </div>
         </div>
+        <button class="btn btn-reveal w-full" id="btn-create">Create Tournament</button>
+        <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
       </div>
-
-      <button class="btn btn-reveal mt-8" id="btn-create">Create Tournament</button>
-      <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
     </div>
   </div>
 

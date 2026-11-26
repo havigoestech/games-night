@@ -266,6 +266,18 @@ html[data-gn-fill="1"] .trv-game-inner { max-width: min(100%, 1500px); }
   html[data-gn-fill="1"] .score-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 }
 
+/* ── Host setup builders: one wide stacked column ──
+   Trivia and Tournament have content-heavy builders (a rounds / line-up list).
+   Capped at the stock ~520px they read as a narrow "mobile" strip on a laptop
+   or TV. Keep everything in a SINGLE column, stacked top-to-bottom (Play →
+   Teams → Rounds → settings → create button), but widen the card so it uses
+   more of a big screen instead of a phone-width strip; "Fill the screen" widens
+   it further. Element IDs are untouched, so the page JS is unaffected. */
+#screen-setup .card.setup-wide { width: 100%; max-width: 720px; text-align: left; display: flex; flex-direction: column; gap: 16px; }
+#screen-setup .card.setup-wide .setup-main,
+#screen-setup .card.setup-wide .setup-foot { display: flex; flex-direction: column; gap: 16px; }
+html[data-gn-fill="1"] #screen-setup .card.setup-wide { max-width: min(100%, 900px); }
+
 /* ── Light mode ──
    boot.js inverts the whole page at the root (works across every game without
    per-screen surgery). Flip real raster images (QR codes) back so they stay

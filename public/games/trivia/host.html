@@ -147,34 +147,38 @@
       <h1 class="heading" style="font-size:2.2rem">Trivia</h1>
       <p style="color:var(--text-muted);font-size:0.95rem">Build your quiz night — pick rounds, then share the code.</p>
     </div>
-    <div class="card col gap-16" style="max-width:520px">
-      <div>
-        <div class="section-label">Play as</div>
-        <div class="seg" id="seg-mode">
-          <button data-mode="teams" class="active">Teams</button>
-          <button data-mode="individual">Solo (free-for-all)</button>
+    <div class="card setup-wide">
+      <div class="setup-main">
+        <div>
+          <div class="section-label">Play as</div>
+          <div class="seg" id="seg-mode">
+            <button data-mode="teams" class="active">Teams</button>
+            <button data-mode="individual">Solo (free-for-all)</button>
+          </div>
+        </div>
+        <div id="teams-setup">
+          <div class="section-label">How many teams?</div>
+          <div class="stepper">
+            <button id="team-minus">−</button>
+            <div class="val" id="team-count">2</div>
+            <button id="team-plus">+</button>
+          </div>
+          <div id="team-name-inputs" class="col gap-8" style="margin-top:12px"></div>
         </div>
       </div>
-      <div id="teams-setup">
-        <div class="section-label">How many teams?</div>
-        <div class="stepper">
-          <button id="team-minus">−</button>
-          <div class="val" id="team-count">2</div>
-          <button id="team-plus">+</button>
-        </div>
-        <div id="team-name-inputs" class="col gap-8" style="margin-top:12px"></div>
-      </div>
-      <div>
+      <div class="setup-aside">
         <div class="section-label">Rounds</div>
         <div id="playlist" class="col gap-10"></div>
         <button class="btn-add-round w-full mt-8" id="btn-add-round">＋ Add round</button>
       </div>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:12px 14px;text-align:left">
-        <input type="checkbox" id="clean-toggle" checked style="width:20px;height:20px;accent-color:#34C759;flex-shrink:0;cursor:pointer">
-        <span style="font-size:0.95rem;font-weight:600">👨‍👩‍👧 Family-friendly — hide rude questions</span>
-      </label>
-      <button class="btn btn-reveal mt-8" id="btn-create">Create Room</button>
-      <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
+      <div class="setup-foot">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:12px 14px;text-align:left">
+          <input type="checkbox" id="clean-toggle" checked style="width:20px;height:20px;accent-color:#34C759;flex-shrink:0;cursor:pointer">
+          <span style="font-size:0.95rem;font-weight:600">👨‍👩‍👧 Family-friendly — hide rude questions</span>
+        </label>
+        <button class="btn btn-reveal w-full" id="btn-create">Create Room</button>
+        <div id="debug-log" style="font-size:0.75rem;color:#FF9500;min-height:1.2em;font-weight:700;text-align:center"></div>
+      </div>
     </div>
   </div>
 
