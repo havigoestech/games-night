@@ -4,10 +4,11 @@
 // word + five forbidden words). Their teammates shout guesses; the describer
 // taps "Got it ✓" (point) or "Skip". A per-turn timer runs down. The host TV
 // shows the clock, the running score and whose turn it is — but NEVER the word,
-// so the room can't see it. At the end of a turn the host reviews the words that
-// were got and can STRIKE any that were wrongly awarded (describer slipped a
-// forbidden word), removing the point. Teams take turns across a set number of
-// rounds; the describer rotates through each team's members.
+// so the room can't see it. At the end of a turn the host reviews the words and
+// can flip any of them either way — pull back a point that was wrongly awarded
+// (a forbidden word slipped out) or award one the describer skipped by mistake.
+// Teams take turns across a set number of rounds; the describer rotates through
+// each team's members.
 //
 // Same skeleton as the other games (grab-the-mic is the reference): a module-
 // level rooms Map, a snapshot() that paints any phase for reconnects, and the
@@ -46,8 +47,12 @@ function publicPlayers(room) {
 function clearTurnTimer(room) {
   if (room.turnTimer) { clearInterval(room.turnTimer); room.turnTimer = null; }
 }
-function liveGot(room) { return room.turnLog.filter(e => e.result === 'got' && !e.struck).length; }
-function skippedCount(room) { return room.turnLog.filter(e => e.result === 'skipped').length; }
+// A word's EFFECTIVE result after any host correction. `struck` records that the
+// host flipped the describer's original call — got→skip (pull a point back) or
+// skip→got (award one). Counts and score always follow the effective result.
+function effGot(e) { return e.result === 'got' ? !e.struck : !!e.struck; }
+function liveGot(room) { return room.turnLog.filter(effGot).length; }
+function skippedCount(room) { return room.turnLog.filter(e => !effGot(e)).length; }
 
 // Deal the next card from the shuffled deck; reshuffle when exhausted so a long
 // game never runs dry. A serial number guards got/skip against double-taps.
@@ -370,15 +375,21 @@ module.exports = function registerNoSayAm(namespace, localIP, port) {
       endTurn(room);
     });
 
-    // Host strikes (toggles) a GOT word at turn-over — removes/restores the point.
+    // Host taps a word at turn-over to FLIP whether it scored, in either
+    // direction: strike a 'got' that slipped a forbidden word (−1), or award a
+    // word the describer skipped by mistake (+1). `struck` marks that the host
+    // overrode the original call; the score moves by the before/after difference
+    // so repeated toggles stay exact.
     socket.on('strike', ({ index }) => {
       const room = rooms.get(socket.roomCode);
       if (!room || !socket.isHost || room.phase !== 'turn-over') return;
       const entry = room.turnLog[index];
-      if (!entry || entry.result !== 'got') return;
+      if (!entry) return;
+      const before = effGot(entry) ? 1 : 0;
       entry.struck = !entry.struck;
+      const after = effGot(entry) ? 1 : 0;
       const team = room.teams[room.describerTeamIndex];
-      if (team) team.score += entry.struck ? -1 : 1;
+      if (team) team.score += (after - before);
       namespace.to(room.roomCode).emit('turn-over', {
         describerName: room.describerName,
         teamIndex: room.describerTeamIndex, teamName: team ? team.name : '', teamColor: team ? team.color : '#fff',

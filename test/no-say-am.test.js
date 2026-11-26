@@ -102,6 +102,20 @@ async function main() {
     ok(toStruck.got === 0 && toStruck.turnLog[gotIndex].struck === true, 'striking marks the word struck and got drops to 0');
     ok(toStruck.scores.find(s => s.name === 'Reds').score === 0, 'Reds back to 0 after the strike');
 
+    console.log('\n── Host AWARDS the skipped word (reverse direction) → point added ──');
+    const skipIndex = skipEntries[0].index;
+    const toAwardP = once(host, 'turn-over');
+    host.emit('strike', { index: skipIndex });
+    const toAward = await toAwardP;
+    ok(toAward.turnLog[skipIndex].struck === true, 'the skipped word is now marked (host awarded it)');
+    ok(toAward.got === 1, 'got count rises to 1 — the awarded skip now counts');
+    ok(toAward.scores.find(s => s.name === 'Reds').score === 1, 'Reds earn a point from the skip award');
+
+    const toUndoP = once(host, 'turn-over');
+    host.emit('strike', { index: skipIndex });        // toggle it back off
+    const toUndo = await toUndoP;
+    ok(toUndo.got === 0 && toUndo.scores.find(s => s.name === 'Reds').score === 0, 'awarding is reversible — toggles back to 0');
+
     console.log('\n── Next → team 1 turn, then round ends → game-over ──');
     const ti1P = once(host, 'turn-intro');
     host.emit('next');

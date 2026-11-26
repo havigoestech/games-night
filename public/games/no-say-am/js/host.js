@@ -162,16 +162,13 @@ socket.on('turn-over', (d) => {
   document.getElementById('over-summary').innerHTML = `✅ <strong>${d.got}</strong> got &nbsp;·&nbsp; ⏭ ${d.skipped} skipped`;
   const box = document.getElementById('over-words'); box.innerHTML = '';
   (d.turnLog || []).forEach(e => {
+    const effGot = e.result === 'got' ? !e.struck : !!e.struck;   // currently scoring?
     const chip = document.createElement('div');
-    if (e.result === 'got') {
-      chip.className = 'nsa-chip got' + (e.struck ? ' struck' : '');
-      chip.innerHTML = `<span class="mark">${e.struck ? '✕' : '✓'}</span><span>${escapeHtml(e.word)}</span>`;
-      chip.title = e.struck ? 'Tap to restore the point' : 'Tap to remove this point';
-      chip.addEventListener('click', () => socket.emit('strike', { index: e.index }));
-    } else {
-      chip.className = 'nsa-chip skipped';
-      chip.innerHTML = `<span class="mark">⏭</span><span>${escapeHtml(e.word)}</span>`;
-    }
+    chip.className = 'nsa-chip ' + (effGot ? 'got' : 'skipped') + (e.struck ? ' corrected' : '');
+    chip.innerHTML = `<span class="mark">${effGot ? '✓' : '⏭'}</span><span>${escapeHtml(e.word)}</span>`
+      + (e.struck ? `<span class="nsa-tag">${effGot ? '+1' : '−1'}</span>` : '');
+    chip.title = effGot ? 'Tap to take this point away' : 'Tap to award a point';
+    chip.addEventListener('click', () => socket.emit('strike', { index: e.index }));
     box.appendChild(chip);
   });
   if (!(d.turnLog || []).length) box.innerHTML = '<div style="color:var(--text-muted)">No words this turn.</div>';
