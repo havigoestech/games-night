@@ -46,28 +46,44 @@
 
   function buildControl() {
     if (document.getElementById('gn-display-ctl')) return;
-    var lbl = 'font-size:0.7rem;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;color:rgba(255,255,255,0.55)';
-    var rng = 'width:100%;accent-color:#5AC8FA;margin:3px 0 11px';
-    var modeBtn = 'flex:1;padding:8px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.05);color:#fff;font-weight:700;font-size:0.85rem;cursor:pointer';
-    var sBtn = 'width:34px;height:30px;border:none;border-radius:8px;background:rgba(255,255,255,0.1);color:#fff;font-weight:800;cursor:pointer';
+    // Panel chrome uses fixed px (never the app's scalable rem) so the control
+    // stays a comfortable, stable size even when the app text is cranked to 190%.
+    var lbl = 'font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:rgba(255,255,255,0.5)';
+    var valS = 'float:right;font-weight:800;font-size:12px;color:rgba(255,255,255,0.85)';
+    var sec = 'padding:14px 16px;border-top:1px solid rgba(255,255,255,0.07)';
+    var rng = 'width:100%;accent-color:#5AC8FA;margin:10px 0 2px';
+    var modeBtn = 'flex:1;padding:11px 8px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.05);color:#fff;font-weight:700;font-size:13px;cursor:pointer';
+    var sBtn = 'width:38px;height:34px;border:none;border-radius:9px;background:rgba(255,255,255,0.1);color:#fff;font-weight:800;font-size:15px;cursor:pointer';
     var wrap = document.createElement('div');
     wrap.id = 'gn-display-ctl';
-    wrap.style.cssText = 'position:fixed;top:8px;right:8px;z-index:3000;font-family:Nunito,system-ui,sans-serif';
+    wrap.style.cssText = 'position:fixed;top:10px;right:10px;z-index:3000;font-family:Nunito,system-ui,sans-serif';
     wrap.innerHTML =
-      '<button type="button" id="gn-ctl-btn" aria-label="Display settings" style="width:40px;height:40px;border:none;border-radius:11px;background:rgba(20,20,34,0.72);color:#fff;font-size:19px;line-height:1;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.4)">🎨</button>' +
-      '<div id="gn-ctl-panel" style="display:none;margin-top:6px;width:238px;max-height:calc(100vh - 66px);overflow-y:auto;background:rgba(14,14,24,0.98);border:1px solid rgba(255,255,255,0.14);border-radius:14px;padding:13px;box-shadow:0 14px 34px rgba(0,0,0,0.55)">' +
-        '<div style="' + lbl + ';margin-bottom:7px">Appearance</div>' +
-        '<div style="display:flex;gap:6px;margin-bottom:10px"><button type="button" id="gn-dark" style="' + modeBtn + '">🌙 Dark</button><button type="button" id="gn-light-btn" style="' + modeBtn + '">☀️ Light</button></div>' +
-        '<div id="gn-lt-row" style="display:none;gap:7px;margin-bottom:12px"></div>' +
-        '<div style="' + lbl + '">Colour <span id="gn-sat-v" style="float:right;color:rgba(255,255,255,0.8)"></span></div>' +
-        '<input type="range" id="gn-sat" min="0" max="100" style="' + rng + '">' +
-        '<div style="' + lbl + '">Brightness <span id="gn-bright-v" style="float:right;color:rgba(255,255,255,0.8)"></span></div>' +
-        '<input type="range" id="gn-bright" min="55" max="105" style="' + rng + '">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px"><span style="' + lbl + '">Text size</span><span style="display:flex;gap:6px"><button type="button" id="gn-td" style="' + sBtn + '">A−</button><span id="gn-text-v" style="min-width:44px;text-align:center;align-self:center;font-weight:800;font-size:0.82rem;color:#fff"></span><button type="button" id="gn-tu" style="' + sBtn + '">A+</button></span></div>' +
-        '<div style="' + lbl + ';margin-bottom:5px">Text weight</div>' +
-        '<div id="gn-weight-row" style="display:flex;gap:6px;margin-bottom:12px"></div>' +
-        '<label style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;font-size:0.9rem;font-weight:700;color:#fff"><span>Fill the screen</span><input type="checkbox" id="gn-fill" style="width:20px;height:20px;accent-color:#34C759;cursor:pointer"></label>' +
-        '<button type="button" id="gn-fs" style="width:100%;margin-top:12px;padding:9px;border:none;border-radius:9px;background:rgba(255,255,255,0.1);color:#fff;font-weight:700;font-size:0.9rem;cursor:pointer">⛶ Full screen</button>' +
+      '<button type="button" id="gn-ctl-btn" aria-label="Display settings" style="width:42px;height:42px;border:none;border-radius:12px;background:rgba(20,20,34,0.78);color:#fff;font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.45)">🎨</button>' +
+      '<div id="gn-ctl-panel" style="display:none;margin-top:8px;width:272px;max-height:calc(100vh - 78px);overflow-y:auto;background:rgba(16,16,28,0.985);border:1px solid rgba(255,255,255,0.13);border-radius:16px;box-shadow:0 18px 40px rgba(0,0,0,0.6);font-size:14px;line-height:1.3">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px 12px">' +
+          '<span style="font-size:15px;font-weight:800;color:#fff">Display</span>' +
+          '<button type="button" id="gn-ctl-close" aria-label="Close" style="width:26px;height:26px;border:none;border-radius:8px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);font-size:13px;cursor:pointer;line-height:1">✕</button>' +
+        '</div>' +
+        '<div style="' + sec + '">' +
+          '<div style="' + lbl + ';margin-bottom:9px">Appearance</div>' +
+          '<div style="display:flex;gap:8px"><button type="button" id="gn-dark" style="' + modeBtn + '">🌙 Dark</button><button type="button" id="gn-light-btn" style="' + modeBtn + '">☀️ Light</button></div>' +
+          '<div id="gn-lt-row" style="display:none;gap:7px;margin-top:9px"></div>' +
+        '</div>' +
+        '<div style="' + sec + '">' +
+          '<div style="' + lbl + '">Colour <span id="gn-sat-v" style="' + valS + '"></span></div>' +
+          '<input type="range" id="gn-sat" min="0" max="100" style="' + rng + '">' +
+          '<div style="' + lbl + ';margin-top:13px">Brightness <span id="gn-bright-v" style="' + valS + '"></span></div>' +
+          '<input type="range" id="gn-bright" min="55" max="105" style="' + rng + '">' +
+        '</div>' +
+        '<div style="' + sec + '">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between"><span style="' + lbl + '">Text size</span><span style="display:flex;gap:8px;align-items:center"><button type="button" id="gn-td" style="' + sBtn + '">A−</button><span id="gn-text-v" style="min-width:48px;text-align:center;font-weight:800;font-size:13px;color:#fff"></span><button type="button" id="gn-tu" style="' + sBtn + '">A+</button></span></div>' +
+          '<div style="' + lbl + ';margin:14px 0 7px">Text weight</div>' +
+          '<div id="gn-weight-row" style="display:flex;gap:7px"></div>' +
+        '</div>' +
+        '<div style="' + sec + '">' +
+          '<label style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;font-size:13px;font-weight:700;color:#fff"><span>Fill the screen</span><input type="checkbox" id="gn-fill" style="width:21px;height:21px;accent-color:#34C759;cursor:pointer"></label>' +
+          '<button type="button" id="gn-fs" style="width:100%;margin-top:11px;padding:10px;border:none;border-radius:10px;background:rgba(255,255,255,0.1);color:#fff;font-weight:700;font-size:13px;cursor:pointer">⛶ Full screen</button>' +
+        '</div>' +
       '</div>';
     (document.body || document.documentElement).appendChild(wrap);
 
@@ -75,6 +91,7 @@
     var btn = document.getElementById('gn-ctl-btn');
     ['click', 'pointerdown', 'mousedown', 'touchstart'].forEach(function (ev) { wrap.addEventListener(ev, function (e) { e.stopPropagation(); }, ev === 'touchstart' ? { passive: true } : false); });
     btn.addEventListener('click', function () { panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; });
+    document.getElementById('gn-ctl-close').addEventListener('click', function () { panel.style.display = 'none'; });
     document.addEventListener('click', function () { panel.style.display = 'none'; });
 
     var sat = document.getElementById('gn-sat'), bright = document.getElementById('gn-bright');
@@ -91,7 +108,7 @@
       LIGHT_THEMES.forEach(function (th, i) {
         var b = document.createElement('button'); b.type = 'button'; b.textContent = th.name;
         var o = i === cur;
-        b.style.cssText = 'flex:1 0 28%;padding:6px 4px;border-radius:7px;cursor:pointer;color:#fff;font-size:0.72rem;font-weight:700;white-space:nowrap;border:1.5px solid ' + (o ? '#5AC8FA' : 'rgba(255,255,255,0.14)') + ';background:' + (o ? 'rgba(90,200,250,0.18)' : 'rgba(255,255,255,0.05)');
+        b.style.cssText = 'flex:1 0 29%;padding:8px 4px;border-radius:8px;cursor:pointer;color:#fff;font-size:12px;font-weight:700;white-space:nowrap;border:1.5px solid ' + (o ? '#5AC8FA' : 'rgba(255,255,255,0.14)') + ';background:' + (o ? 'rgba(90,200,250,0.18)' : 'rgba(255,255,255,0.05)');
         b.addEventListener('click', function () { ls.set('gn-lt', String(i)); apply(); renderThemes(); });
         row.appendChild(b);
       });
@@ -102,7 +119,7 @@
       WEIGHTS.forEach(function (w) {
         var b = document.createElement('button'); b.type = 'button'; b.textContent = w[1];
         var o = cur === w[0];
-        b.style.cssText = 'flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid ' + (o ? '#5AC8FA' : 'rgba(255,255,255,0.14)') + ';background:' + (o ? 'rgba(90,200,250,0.18)' : 'rgba(255,255,255,0.05)') + ';color:#fff;font-size:0.8rem;cursor:pointer;font-weight:' + (w[0] === 'light' ? '400' : w[0] === 'medium' ? '600' : '800');
+        b.style.cssText = 'flex:1;padding:9px 4px;border-radius:9px;border:1.5px solid ' + (o ? '#5AC8FA' : 'rgba(255,255,255,0.14)') + ';background:' + (o ? 'rgba(90,200,250,0.18)' : 'rgba(255,255,255,0.05)') + ';color:#fff;font-size:12px;cursor:pointer;font-weight:' + (w[0] === 'light' ? '400' : w[0] === 'medium' ? '600' : '800');
         b.addEventListener('click', function () { ls.set('gn-weight', w[0]); apply(); renderWeight(); });
         row.appendChild(b);
       });

@@ -19,6 +19,13 @@ html, body {
   overflow: hidden;
 }
 
+/* Form controls don't inherit font metrics by default: a bare <select>/<button>
+   stays frozen at the UA size (~13px) and so ignores the text-size display
+   control (boot.js scales rem-based text via the root font-size). Give them the
+   app font + a scalable 1rem base. More-specific rules (.btn-*, .trv-round-grid
+   select, …) still win, so nothing intentional is overridden. */
+button, input, select, textarea { font-family: inherit; font-size: 1rem; }
+
 h1, h2, h3, .heading { font-family: 'Fredoka', sans-serif; }
 
 /* ── Cards ── */
