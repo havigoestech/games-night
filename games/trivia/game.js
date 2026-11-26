@@ -22,7 +22,7 @@ const rooms = new Map();
 // Category list for the host's playlist builder, derived from the MC bank.
 let MC_CATEGORIES = [];
 try {
-  const b = require('./data/questions-mc.js').QUESTIONS || [];
+  const b = require('./data/questions-all.js').QUESTIONS || [];
   const c = {}; b.forEach(q => { c[q.cat] = (c[q.cat] || 0) + 1; });
   MC_CATEGORIES = Object.keys(c).sort();
 } catch (e) { MC_CATEGORIES = []; }

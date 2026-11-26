@@ -14,7 +14,7 @@
 // Content: the existing Open Trivia DB multiple-choice bank, re-indexed by the
 // first letter of each answer (we keep only recall-style questions with a short,
 // alphabetic answer — no "which of these…" and no numeric/date answers).
-const { QUESTIONS } = require('../data/questions-mc.js');
+const { QUESTIONS } = require('../data/questions-all.js');
 
 const BASE_POINTS = 500;   // any correct answer
 const SPEED_BONUS = 500;   // extra, scaled by how fast (instant ≈ +500)

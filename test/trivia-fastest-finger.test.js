@@ -11,7 +11,7 @@ const { io } = require('socket.io-client');
 
 const PORT = 3105;
 const BASE = `http://localhost:${PORT}/trivia`;
-const BANK = require('../games/trivia/data/questions-mc.js').QUESTIONS;
+const BANK = require('../games/trivia/data/questions-all.js').QUESTIONS;
 const correctByQ = new Map(BANK.map(q => [q.q, q.correct]));
 
 let passed = 0, failed = 0;

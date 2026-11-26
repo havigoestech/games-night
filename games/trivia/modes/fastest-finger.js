@@ -10,7 +10,7 @@
 //   youState(room, playerId)  — per-player bit for snapshots (have they answered, what did they pick)
 
 let BANK = [];
-try { BANK = require('../data/questions-mc.js').QUESTIONS || []; } catch (e) { BANK = []; }
+try { BANK = require('../data/questions-all.js').QUESTIONS || []; } catch (e) { BANK = []; }
 
 const BASE_POINTS = 500;   // for any correct answer
 const SPEED_BONUS = 500;   // extra, scaled by how fast (instant ≈ +500, buzzer ≈ +0)
@@ -26,6 +26,19 @@ const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 // default pool (still pickable on purpose by selecting the category).
 const NICHE = new Set(['Japanese Anime & Manga', 'Cartoon & Animations', 'Video Games', 'Board Games', 'Comics']);
 
+// Session-level no-repeat: remember recently served questions ACROSS rooms (not
+// just within one game) so the same ones don't resurface game-after-game during
+// a sitting. Picks are biased away from them; the oldest is evicted when full.
+const RECENT = new Set();
+const RECENT_ORDER = [];
+const RECENT_MAX = 400;
+function rememberServed(q) {
+  const k = norm(q.q);
+  if (RECENT.has(k)) return;
+  RECENT.add(k); RECENT_ORDER.push(k);
+  if (RECENT_ORDER.length > RECENT_MAX) RECENT.delete(RECENT_ORDER.shift());
+}
+
 function pickQuestion(room, cfg) {
   const wantCat = cfg.category && cfg.category !== 'any' ? cfg.category : null;
   const wantDiff = cfg.difficulty && cfg.difficulty !== 'any' ? cfg.difficulty : null;
@@ -35,7 +48,8 @@ function pickQuestion(room, cfg) {
     // "Any difficulty" leans easier (drops hard) for a friendlier default; a chosen difficulty is honoured.
     (wantDiff ? q.diff === wantDiff : q.diff !== 'hard') &&
     (!room.familyFriendly || q.clean !== false);
-  let pool = BANK.filter(q => match(q) && !room.usedQuestions.has(norm(q.q)));
+  let pool = BANK.filter(q => match(q) && !room.usedQuestions.has(norm(q.q)) && !RECENT.has(norm(q.q)));
+  if (!pool.length) pool = BANK.filter(q => match(q) && !room.usedQuestions.has(norm(q.q))); // allow recently-served
   if (!pool.length) pool = BANK.filter(match);                 // ran out — allow repeats
   if (!pool.length) pool = BANK.filter(q => !room.familyFriendly || q.clean !== false); // ignore cat/diff
   if (!pool.length) pool = BANK.slice();
@@ -48,6 +62,7 @@ module.exports = {
   pickAndStart(room, cfg) {
     const q = pickQuestion(room, cfg);
     room.usedQuestions.add(norm(q.q));
+    rememberServed(q);
     const options = shuffle([q.correct, ...q.wrong.slice(0, 3)]);
     room.currentQuestion = q;
     room.modeState = {

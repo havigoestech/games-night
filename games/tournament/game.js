@@ -24,7 +24,7 @@ const rooms = new Map();
 // list (from the MC bank) and the playable modes' meta.
 let TRIVIA_CATEGORIES = [];
 try {
-  const b = require('../trivia/data/questions-mc.js').QUESTIONS || [];
+  const b = require('../trivia/data/questions-all.js').QUESTIONS || [];
   const seen = {}; b.forEach(q => { if (q && q.cat) seen[q.cat] = 1; });
   TRIVIA_CATEGORIES = Object.keys(seen).sort();
 } catch (e) { TRIVIA_CATEGORIES = []; }

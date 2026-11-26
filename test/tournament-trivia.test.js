@@ -8,7 +8,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const { io } = require('socket.io-client');
-const { QUESTIONS } = require('../games/trivia/data/questions-mc.js');
+const { QUESTIONS } = require('../games/trivia/data/questions-all.js');
 
 const PORT = 3101;
 let passed = 0, failed = 0;
