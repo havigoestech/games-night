@@ -32,7 +32,8 @@ const CATALOG = [
   { slug: 'family-feud',     name: 'Family Feud',  icon: '🎯', twoSided: true,  lengthLabel: 'Questions', lengthDefault: 5 },
   { slug: 'text-twist',      name: 'Text Twist',   icon: '🔤', twoSided: false, lengthLabel: 'Rounds',    lengthDefault: 3 },
   { slug: 'kill-and-injury', name: 'Kill & Injury',icon: '🕵️', twoSided: true,  lengthLabel: 'Matches',   lengthDefault: 3 },
-  { slug: 'trivia',          name: 'Trivia',       icon: '🧠', twoSided: false, lengthLabel: 'Questions', lengthDefault: 8 }
+  { slug: 'trivia',          name: 'Trivia',       icon: '🧠', twoSided: false, lengthLabel: 'Questions', lengthDefault: 8 },
+  { slug: 'no-say-am',       name: 'No Say Am',    icon: '🙊', twoSided: false, lengthLabel: 'Rounds',    lengthDefault: 3 }
 ];
 
 // Per-game settings the host can tweak for each round. Keys match exactly what
@@ -59,6 +60,9 @@ const GAME_SETTINGS = {
     { key: 'category',   label: 'Category',   def: 'any',            full: true, opts: 'CATS' },
     { key: 'difficulty', label: 'Difficulty', def: 'any',  opts: [['any','Any'],['easy','Easy'],['medium','Medium'],['hard','Hard']] },
     { key: 'seconds',    label: 'Timer',      def: '20',   opts: [['15','15s'],['20','20s'],['30','30s'],['45','45s']] }
+  ],
+  'no-say-am': [
+    { key: 'turnSeconds', label: 'Turn timer', def: '60', opts: [['45','45s'],['60','60s'],['90','90s'],['120','120s']] }
   ]
 };
 

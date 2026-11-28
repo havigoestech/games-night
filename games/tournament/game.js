@@ -15,7 +15,8 @@ const GAME_CATALOG = {
   'family-feud':    { name: 'Family Feud',  icon: '🎯', twoSided: true,  lengthLabel: 'Questions', lengthDefault: 5 },
   'text-twist':     { name: 'Text Twist',   icon: '🔤', twoSided: false, lengthLabel: 'Rounds', lengthDefault: 3 },
   'kill-and-injury':{ name: 'Kill & Injury',icon: '🕵️', twoSided: true,  lengthLabel: 'Matches', lengthDefault: 3 },
-  'trivia':         { name: 'Trivia',       icon: '🧠', twoSided: false, lengthLabel: 'Questions', lengthDefault: 8 }
+  'trivia':         { name: 'Trivia',       icon: '🧠', twoSided: false, lengthLabel: 'Questions', lengthDefault: 8 },
+  'no-say-am':      { name: 'No Say Am',    icon: '🙊', twoSided: false, lengthLabel: 'Rounds', lengthDefault: 3 }
 };
 
 const rooms = new Map();
